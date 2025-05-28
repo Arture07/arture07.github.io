@@ -1,20 +1,45 @@
 import os
-import uuid 
+import json
+import uuid
 from flask import Flask, send_from_directory, jsonify, request
 import firebase_admin
-from firebase_admin import credentials, firestore, storage 
-from werkzeug.security import check_password_hash, generate_password_hash # Garanta esta importação
-from datetime import datetime, timezone, timedelta # Garanta estas importações
-import requests 
-import re 
+from firebase_admin import credentials, firestore, storage
+from werkzeug.security import check_password_hash, generate_password_hash
+from datetime import datetime, timezone, timedelta
+import requests
+import re
 from collections import Counter, defaultdict
 import traceback
+from flask_cors import CORS
 
 app = Flask(__name__, static_folder='src', static_url_path='')
 
+# 2) Ler a chave do Firebase a partir da variável de ambiente  
+json_str = os.environ.get('FIREBASE_SERVICE_ACCOUNT_JSON')
+if json_str:
+    cred = credentials.Certificate(json.loads(json_str))
+else:
+    # fallback local (somente pra dev), substitua de verdade pelo seu PROJECT ID
+    chave_json_path = os.path.join(
+        os.path.dirname(__file__),
+        "biblioteca-py-6b33e-firebase-adminsdk-fbsvc-bd95a47a25.json"
+    )
+    cred = credentials.Certificate(chave_json_path)
+
+# 3) Inicializar o Firebase Admin
+firebase_admin.initialize_app(cred, {
+    'storageBucket': 'biblioteca-py-6b33e.appspot.com'
+})
+db = firestore.client()
+bucket = storage.bucket()
+
+# 4) Configurar o CORS **após** criar o `app`  
+origins = [
+    "https://arture07.github.io"       # O domínio do seu GitHub Pages
+]
+CORS(app, resources={ r"/api/*": {"origins": origins} }, supports_credentials=True)
+
 # --- Configuração do Firebase ---
-db = None
-bucket = None 
 FIREBASE_PROJECT_ID = "biblioteca-py-6b33e" 
 STORAGE_BUCKET_NAME = f"{FIREBASE_PROJECT_ID}.appspot.com"
 ASSIGNABLE_ROLES = ['admin', 'catalogador', 'atendente', 'analista'] 
