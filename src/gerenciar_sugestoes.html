@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gerenciar Sugestões - ShelfWise</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        .table-cell-actions { min-width: 200px; } /* Espaço para botões de status */
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-800">
+    <div id="message-container" class="fixed bottom-6 right-6 z-[1000] space-y-2"></div>
+
+    <div id="suggestionFeedbackModal" class="modal fixed inset-0 z-[70] flex items-center justify-center p-4 hidden">
+        <div class="modal-overlay absolute inset-0 bg-black opacity-50"></div>
+        <div class="modal-content bg-white p-6 md:p-8 rounded-lg shadow-xl w-full max-w-md transform transition-all">
+            <div class="flex justify-between items-center mb-6">
+                <h2 id="suggestionFeedbackModalTitle" class="text-xl font-semibold text-gray-800">Adicionar Feedback</h2>
+                <button id="closeSuggestionFeedbackModalButton" class="text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
+            </div>
+            <form id="formSuggestionFeedback">
+                <input type="hidden" id="feedbackSuggestionId">
+                <input type="hidden" id="feedbackNewStatus">
+                <div>
+                    <label for="adminFeedbackText" class="block text-sm font-medium text-gray-700 mb-1">Feedback para o cliente (opcional):</label>
+                    <textarea id="adminFeedbackText" name="admin_feedback" rows="3" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-sky-500 focus:border-sky-500 sm:text-sm" placeholder="Ex: Livro já adicionado ao catálogo." maxlength="500"></textarea>
+                </div>
+                <div class="mt-6 flex justify-end space-x-3">
+                    <button type="button" id="cancelSuggestionFeedbackButton" class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md shadow-sm">Cancelar</button>
+                    <button type="submit" id="confirmSuggestionFeedbackButton" class="px-4 py-2 text-sm font-medium text-white bg-sky-600 hover:bg-sky-700 rounded-md shadow-sm">Confirmar Mudança de Status</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+
+    <div class="min-h-screen flex flex-col">
+        <header class="bg-white shadow-sm sticky top-0 z-30">
+            <div class="container mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex justify-between items-center py-4">
+                    <a href="index.html" class="flex items-center">
+                        <svg class="h-8 w-auto text-sky-600 mr-2" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M4 4a2 2 0 012-2h8a2 2 0 012 2v12a1 1 0 11-2 0V4H6v12a1 1 0 11-2 0V4zm10.5 11.5a.5.5 0 00-.5-.5h-3a.5.5 0 000 1h3a.5.5 0 00.5-.5zm0-2a.5.5 0 00-.5-.5h-3a.5.5 0 000 1h3a.5.5 0 00.5-.5zm0-2a.5.5 0 00-.5-.5h-3a.5.5 0 000 1h3a.5.5 0 00.5-.5zM6 5h8v1H6V5z" clip-rule="evenodd"></path></svg>
+                        <span class="font-bold text-2xl text-sky-700">ShelfWise</span>
+                    </a>
+                    <div class="flex items-center">
+                        <span id="user-greeting" class="text-sm font-medium text-gray-600 mr-3 hidden sm:block"></span>
+                        <div id="user-avatar" class="w-8 h-8 bg-sky-600 rounded-full flex items-center justify-center text-white font-semibold text-sm ring-2 ring-offset-2 ring-sky-500 hidden">AD</div>
+                        <button id="logout-button" class="ml-4 text-sm text-gray-600 hover:text-sky-700 hidden">Sair</button>
+                    </div>
+                </div>
+            </header>
+
+        <main class="flex-grow container mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div id="access-denied" class="hidden text-center py-10">
+                {/* ... (Conteúdo de Acesso Negado) ... */}
+            </div>
+
+            <div id="admin-manage-suggestions-view" class="hidden">
+                <div class="flex flex-col sm:flex-row justify-between items-center mb-6">
+                    <h1 class="text-2xl sm:text-3xl font-bold text-gray-800 mb-4 sm:mb-0">Gerenciar Sugestões de Aquisição</h1>
+                    <a href="index.html" class="bg-gray-600 hover:bg-gray-700 text-white font-semibold py-2 px-4 rounded-md shadow-md transition duration-150 ease-in-out flex items-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 mr-2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 15L3 9m0 0l6-6M3 9h12a6 6 0 010 12h-3" /></svg>
+                        Voltar ao Painel
+                    </a>
+                </div>
+                
+                <div class="mb-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label for="suggestion-search-input" class="block text-sm font-medium text-gray-700 mb-1">Buscar por Título, Autor ou Solicitante:</label>
+                        <input type="search" id="suggestion-search-input" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-sky-500 focus:border-sky-500 sm:text-sm" placeholder="Digite para buscar...">
+                    </div>
+                    <div>
+                        <label for="suggestion-status-filter" class="block text-sm font-medium text-gray-700 mb-1">Filtrar por Status:</label>
+                        <select id="suggestion-status-filter" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-sky-500 focus:border-sky-500 sm:text-sm">
+                            <option value="">Todos os Status</option>
+                            <option value="pendente">Pendente</option>
+                            <option value="aprovada">Aprovada</option>
+                            <option value="rejeitada">Rejeitada</option>
+                            <option value="adquirido">Adquirido</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="overflow-x-auto bg-white shadow-md rounded-lg">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Título Sugerido</th>
+                                <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Autor Sugerido</th>
+                                <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden md:table-cell">Sugerido por</th>
+                                <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden lg:table-cell">Data</th>
+                                <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                                <th scope="col" class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider table-cell-actions">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody id="suggestions-table-body" class="bg-white divide-y divide-gray-200">
+                        </tbody>
+                    </table>
+                </div>
+                <div id="no-suggestions-message" class="hidden text-center py-10 text-gray-500">
+                    <p>Nenhuma sugestão encontrada com os filtros aplicados.</p>
+                </div>
+            </div>
+
+            <div id="login-prompt-admin-suggestions" class="hidden text-center py-10">
+            </div>
+        </main>
+
+        <footer class="bg-white border-t border-gray-200 mt-auto">
+            <div class="container mx-auto px-4 sm:px-6 lg:px-8 py-6 text-center">
+                <p class="text-sm text-gray-500">&copy; <span id="currentYearManageSuggestions"></span> ShelfWise. Todos os direitos reservados.</p>
+            </div>
+        </footer>
+    </div>
+    
+    <script src="manage_suggestions_script.js" defer></script>
+</body>
+</html>
