@@ -11,65 +11,68 @@ import re
 from collections import Counter, defaultdict
 import traceback
 from flask_cors import CORS
+from google.cloud import secretmanager  # <— import do Secret Manager
 
+# --- 0) Configurações iniciais e instanciação do Flask ---
 app = Flask(__name__, static_folder='src', static_url_path='')
 
-# 2) Ler a chave do Firebase a partir da variável de ambiente  
-json_str = os.environ.get('FIREBASE_SERVICE_ACCOUNT_JSON')
-if json_str:
-    cred = credentials.Certificate(json.loads(json_str))
-else:
-    # fallback local (somente pra dev), substitua de verdade pelo seu PROJECT ID
-    chave_json_path = os.path.join(
-        os.path.dirname(__file__),
-        "biblioteca-py-6b33e-firebase-adminsdk-fbsvc-bd95a47a25.json"
-    )
-    cred = credentials.Certificate(chave_json_path)
+# --- 1) Carregar credenciais do Secret Manager ---
+project_id = os.environ.get("GOOGLE_CLOUD_PROJECT")
+secret_name = os.environ.get("SECRET_NAME", "firebase-sa-json")
+secret_client = secretmanager.SecretManagerServiceClient()
+secret_path = f"projects/{project_id}/secrets/{secret_name}/versions/latest"
+secret_response = secret_client.access_secret_version(request={"name": secret_path})
+service_account_json = secret_response.payload.data.decode("UTF-8")
+cred = credentials.Certificate(json.loads(service_account_json))
 
-# 3) Inicializar o Firebase Admin
+# --- 2) Inicializar o Firebase Admin apenas uma vez ---
 firebase_admin.initialize_app(cred, {
     'storageBucket': 'biblioteca-py-6b33e.appspot.com'
 })
 db = firestore.client()
 bucket = storage.bucket()
 
-# 4) Configurar o CORS **após** criar o `app`  
+# --- 3) Configurar CORS após criar o `app` ---
 origins = [
-    "https://arture07.github.io"       # O domínio do seu GitHub Pages
+    "https://arture07.github.io"
 ]
-CORS(app, resources={ r"/api/*": {"origins": origins} }, supports_credentials=True)
+CORS(app, resources={r"/api/*": {"origins": origins}}, supports_credentials=True)
 
-# --- Configuração do Firebase ---
-FIREBASE_PROJECT_ID = "biblioteca-py-6b33e" 
+# --- 4) Constantes do seu app ---
+FIREBASE_PROJECT_ID = "biblioteca-py-6b33e"
 STORAGE_BUCKET_NAME = f"{FIREBASE_PROJECT_ID}.appspot.com"
-ASSIGNABLE_ROLES = ['admin', 'catalogador', 'atendente', 'analista'] 
-ALL_USER_ROLES = ['cliente'] + ASSIGNABLE_ROLES 
+ASSIGNABLE_ROLES = ['admin', 'catalogador', 'atendente', 'analista']
+ALL_USER_ROLES = ['cliente'] + ASSIGNABLE_ROLES
 VALOR_MULTA_POR_DIA = 1.50
-USUARIOS_EXEMPLO = { 
-    "admin@shelfwise.com": {"password_hash": generate_password_hash("admin123"), "role": "admin", "nome": "Super Admin", "status": "ATIVO"},
-    "cliente1@example.com": {"password_hash": generate_password_hash("cliente123"), "role": "cliente", "nome": "Cliente Exemplo Um", "status": "ATIVO"},
-    "test@teste.com": {"password_hash": generate_password_hash("teste123"), "role": "admin", "nome": "Admin Teste Login", "status": "ATIVO"},
+USUARIOS_EXEMPLO = {
+    "admin@shelfwise.com": {
+        "password_hash": generate_password_hash("admin123"),
+        "role": "admin",
+        "nome": "Super Admin",
+        "status": "ATIVO"
+    },
+    "cliente1@example.com": {
+        "password_hash": generate_password_hash("cliente123"),
+        "role": "cliente",
+        "nome": "Cliente Exemplo Um",
+        "status": "ATIVO"
+    },
+    "test@teste.com": {
+        "password_hash": generate_password_hash("teste123"),
+        "role": "admin",
+        "nome": "Admin Teste Login",
+        "status": "ATIVO"
+    },
 }
 
-try:
-    chave_json_path = os.path.join(os.path.dirname(__file__), f"{FIREBASE_PROJECT_ID}-firebase-adminsdk-fbsvc-bd95a47a25.json")
-    if not os.path.exists(chave_json_path): print(f"AVISO: Chave Firebase '{chave_json_path}' não encontrada.")
-    else:
-        if not firebase_admin._apps: 
-            cred_obj = credentials.Certificate(chave_json_path)
-            firebase_admin.initialize_app(cred_obj, {'storageBucket': STORAGE_BUCKET_NAME})
-            print("Firebase Admin SDK inicializado.")
-        else:
-            print("Firebase Admin SDK já inicializado.")
-        db = firestore.client(); bucket = storage.bucket()
-        if db: print("Cliente Firestore obtido.") 
-        else: print("ERRO: Cliente Firestore não pôde ser obtido.")
-        if bucket: print(f"Bucket '{STORAGE_BUCKET_NAME}' conectado.")
-        else: print("ERRO: Bucket do Firebase Storage não pôde ser obtido.")
-except Exception as e: 
-    print(f"ERRO CRÍTICO ao inicializar o Firebase: {e}"); 
-    traceback.print_exc()
-    db = None; bucket = None
+# --- 5) (Opcional) Log de verificação em execução local ---
+if os.getenv("FLASK_ENV") == "development":
+    try:
+        print("Firebase Admin SDK inicializado com Secret Manager.")
+        print("Firestore client:", "OK" if db else "NÃO")
+        print("Storage bucket:", STORAGE_BUCKET_NAME, "OK" if bucket else "NÃO")
+    except Exception:
+        traceback.print_exc()
 
 # --- Funções de Usuário e Autenticação ---
 def get_user_from_firestore(username_email):
