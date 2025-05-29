@@ -1,7 +1,7 @@
 import os
 import json
 import uuid
-from flask import Flask, send_from_directory, jsonify, request
+from flask import Flask, send_from_directory, jsonify, request, make_response # Adicionado make_response
 import firebase_admin
 from firebase_admin import credentials, firestore, storage
 from werkzeug.security import check_password_hash, generate_password_hash
@@ -11,7 +11,7 @@ import re
 from collections import Counter, defaultdict
 import traceback
 from flask_cors import CORS
-from google.cloud import secretmanager  # <— import do Secret Manager
+from google.cloud import secretmanager
 
 # --- 0) Configurações iniciais e instanciação do Flask ---
 app = Flask(__name__, static_folder='src', static_url_path='')
@@ -25,44 +25,110 @@ secret_response = secret_client.access_secret_version(request={"name": secret_pa
 service_account_json = secret_response.payload.data.decode("UTF-8")
 cred = credentials.Certificate(json.loads(service_account_json))
 
-# --- 2) Inicializar o Firebase Admin apenas uma vez ---
-firebase_admin.initialize_app(cred, {
-    'storageBucket': 'biblioteca-py-6b33e.appspot.com'
-})
-db = firestore.client()
-bucket = storage.bucket()
+if project_id:
+    secret_path = f"projects/{project_id}/secrets/{secret_name}/versions/latest"
+    try:
+        secret_response = secret_client.access_secret_version(request={"name": secret_path})
+        service_account_info = json.loads(secret_response.payload.data.decode("UTF-8"))
+        cred = credentials.Certificate(service_account_info)
+        print("Credenciais do Firebase carregadas do Secret Manager.")
+    except Exception as e:
+        print(f"ERRO ao carregar credenciais do Secret Manager: {e}")
+        traceback.print_exc()
+        # Fallback para arquivo local se o Secret Manager falhar ( útil para desenvolvimento local)
+        print("Tentando carregar credenciais de arquivo local como fallback...")
+        chave_json_path_local = os.path.join(os.path.dirname(__file__), "biblioteca-py-6b33e-firebase-adminsdk-fbsvc-bd95a47a25.json") # Nome do seu arquivo local
+        if os.path.exists(chave_json_path_local):
+            cred = credentials.Certificate(chave_json_path_local)
+            print("Credenciais do Firebase carregadas de arquivo local (fallback).")
+        else:
+            print(f"ERRO: Arquivo de credencial local '{chave_json_path_local}' não encontrado. Firebase não pode ser inicializado.")
+            cred = None # Garante que o Firebase não será inicializado sem credenciais
+else:
+    # Desenvolvimento local ou ambiente onde GOOGLE_CLOUD_PROJECT não está setado
+    print("Variável de ambiente GOOGLE_CLOUD_PROJECT não encontrada. Tentando carregar credenciais de arquivo local.")
+    chave_json_path_local = os.path.join(os.path.dirname(__file__), "biblioteca-py-6b33e-firebase-adminsdk-fbsvc-bd95a47a25.json") # Nome do seu arquivo local
+    if os.path.exists(chave_json_path_local):
+        cred = credentials.Certificate(chave_json_path_local)
+        print("Credenciais do Firebase carregadas de arquivo local.")
+    else:
+        print(f"ERRO: Arquivo de credencial local '{chave_json_path_local}' não encontrado. Firebase não pode ser inicializado.")
+        cred = None
+
+db = None
+bucket = None
+FIREBASE_PROJECT_ID_CONST = "biblioteca-py-6b33e" # Use uma constante para o ID do projeto
+STORAGE_BUCKET_NAME_CONST = f"{FIREBASE_PROJECT_ID_CONST}.appspot.com"
+
+if cred: # Só tenta inicializar se as credenciais foram carregadas
+    try:
+        if not firebase_admin._apps:
+            firebase_admin.initialize_app(cred, {
+                'storageBucket': STORAGE_BUCKET_NAME_CONST
+            })
+            print("Firebase Admin SDK inicializado.")
+        else:
+            print("Firebase Admin SDK já estava inicializado.")
+        db = firestore.client()
+        bucket = storage.bucket(name=STORAGE_BUCKET_NAME_CONST) # Especifica o nome do bucket
+        
+        if db: print("Cliente Firestore obtido.")
+        else: print("ERRO: Cliente Firestore não pôde ser obtido após inicialização.")
+        if bucket: print(f"Bucket do Firebase Storage '{STORAGE_BUCKET_NAME_CONST}' conectado.")
+        else: print("ERRO: Bucket do Firebase Storage não pôde ser obtido após inicialização.")
+
+    except Exception as e_init:
+        print(f"ERRO CRÍTICO ao inicializar serviços Firebase após carregar credenciais: {e_init}")
+        traceback.print_exc()
+        db = None
+        bucket = None
+else:
+    print("ERRO: Credenciais do Firebase não foram carregadas. Serviços Firebase não serão inicializados.")
+
 
 # --- 3) Configurar CORS após criar o `app` ---
-origins = [
-    "https://arture07.github.io"
-]
-CORS(app, resources={r"/api/*": {"origins": ["https://arture07.github.io"]}}, supports_credentials=True)
+# A origem DEVE ser específica quando supports_credentials=True.
+# Não use wildcard '*' com credentials.
+CORS(app, 
+     origins=["https://arture07.github.io", "http://localhost:8080", "http://127.0.0.1:8080"], # Adicione localhost para teste local
+     methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+     allow_headers=["Content-Type", "Authorization"], # Adicione outros headers que seu frontend possa enviar
+     supports_credentials=True,
+     expose_headers=["Content-Type", "Authorization"] # Exponha headers se o frontend precisar lê-los
+)
 
-# --- 4) Constantes do seu app ---
-FIREBASE_PROJECT_ID = "biblioteca-py-6b33e"
-STORAGE_BUCKET_NAME = f"{FIREBASE_PROJECT_ID}.appspot.com"
+@app.before_request
+def handle_preflight():
+    if request.method == "OPTIONS":
+        res = make_response()
+        # Os cabeçalhos aqui devem ser consistentes com a configuração do Flask-CORS
+        # e com o que o navegador espera para a requisição real.
+        
+        # O Flask-CORS já deve estar configurando o Access-Control-Allow-Origin
+        # com base na lista `origins` fornecida na inicialização do CORS.
+        # Se você quiser forçar um valor específico aqui, certifique-se que ele corresponda
+        # à origem da requisição se `supports_credentials=True`.
+        # No entanto, é melhor deixar o Flask-CORS gerenciar isso dinamicamente.
+        # Se a origem da requisição estiver na sua lista de `origins` do CORS, ele deve funcionar.
+        
+        # res.headers.add('Access-Control-Allow-Origin', request.headers.get('Origin')) # Deixe o Flask-CORS lidar com isso
+        res.headers.add('Access-Control-Allow-Headers', request.headers.get('Access-Control-Request-Headers'))
+        res.headers.add('Access-Control-Allow-Methods', request.headers.get('Access-Control-Request-Methods'))
+        res.headers.add('Access-Control-Allow-Credentials', 'true')
+        res.headers.add('Access-Control-Max-Age', '3600') # Cache preflight por 1 hora
+        return res, 200
+
+
+# --- 5) Constantes do seu app (já definidas no seu arquivo original) ---
+# FIREBASE_PROJECT_ID = "biblioteca-py-6b33e" # Já definido como FIREBASE_PROJECT_ID_CONST
+# STORAGE_BUCKET_NAME = f"{FIREBASE_PROJECT_ID}.appspot.com" # Já definido como STORAGE_BUCKET_NAME_CONST
 ASSIGNABLE_ROLES = ['admin', 'catalogador', 'atendente', 'analista']
 ALL_USER_ROLES = ['cliente'] + ASSIGNABLE_ROLES
 VALOR_MULTA_POR_DIA = 1.50
-USUARIOS_EXEMPLO = {
-    "admin@shelfwise.com": {
-        "password_hash": generate_password_hash("admin123"),
-        "role": "admin",
-        "nome": "Super Admin",
-        "status": "ATIVO"
-    },
-    "cliente1@example.com": {
-        "password_hash": generate_password_hash("cliente123"),
-        "role": "cliente",
-        "nome": "Cliente Exemplo Um",
-        "status": "ATIVO"
-    },
-    "test@teste.com": {
-        "password_hash": generate_password_hash("teste123"),
-        "role": "admin",
-        "nome": "Admin Teste Login",
-        "status": "ATIVO"
-    },
+USUARIOS_EXEMPLO = { # Mantenha seus usuários de exemplo
+    "admin@shelfwise.com": {"password_hash": generate_password_hash("admin123"), "role": "admin", "nome": "Super Admin", "status": "ATIVO"},
+    "cliente1@example.com": {"password_hash": generate_password_hash("cliente123"), "role": "cliente", "nome": "Cliente Exemplo Um", "status": "ATIVO"},
+    "test@teste.com": {"password_hash": generate_password_hash("teste123"), "role": "admin", "nome": "Admin Teste Login", "status": "ATIVO"},
 }
 
 # --- 5) (Opcional) Log de verificação em execução local ---
@@ -95,7 +161,9 @@ def get_user_from_firestore(username_email):
 def check_user_credentials(username_email, password):
     user_data = get_user_from_firestore(username_email) 
     if user_data and user_data.get('status') == 'ATIVO':
-        if 'password_hash' in user_data and check_password_hash(user_data.get('password_hash'), password):
+        # Verifica se 'password_hash' existe e não é None antes de chamar check_password_hash
+        password_hash_from_db = user_data.get('password_hash')
+        if password_hash_from_db and check_password_hash(password_hash_from_db, password):
             return {"username": user_data.get('username'), 
                     "role": user_data.get("role", "cliente"), 
                     "nome": user_data.get("nome", user_data.get('username'))}
@@ -103,7 +171,9 @@ def check_user_credentials(username_email, password):
     username_email_lower = str(username_email).lower()
     if username_email_lower in USUARIOS_EXEMPLO:
         user_exemplo_data = USUARIOS_EXEMPLO[username_email_lower]
-        if 'password_hash' in user_exemplo_data and check_password_hash(user_exemplo_data['password_hash'], password) and user_exemplo_data.get('status', 'ATIVO') == 'ATIVO':
+        if 'password_hash' in user_exemplo_data and \
+           check_password_hash(user_exemplo_data['password_hash'], password) and \
+           user_exemplo_data.get('status', 'ATIVO') == 'ATIVO':
             return {"username": username_email_lower, 
                     "role": user_exemplo_data.get("role", "cliente"), 
                     "nome": user_exemplo_data.get("nome", username_email_lower)}
@@ -139,21 +209,34 @@ def manage_suggestions_page_route():
 
 
 # --- API Endpoints ---
-@app.route('/api/login', methods=['POST'])
+@app.route('/api/login', methods=['POST', 'OPTIONS'])
 def login_api(): 
-    data = request.get_json()
-    if not data or not data.get('username') or not data.get('password'):
-        return jsonify({"sucesso": False, "erro": "E-mail e senha são obrigatórios"}), 400
-    username_email_input = data.get('username')
-    password = data.get('password')
-    user = check_user_credentials(username_email_input, password)
-    if user:
-        return jsonify({"sucesso": True, "mensagem": "Login bem-sucedido!", "usuario": user}), 200
-    else:
-        user_data_raw = get_user_from_firestore(username_email_input)
-        if user_data_raw and user_data_raw.get('status') == 'INATIVO':
-            return jsonify({"sucesso": False, "erro": "Esta conta de usuário está desativada."}), 403
-        return jsonify({"sucesso": False, "erro": "E-mail ou senha inválidos."}), 401
+    try:
+        data = request.get_json() # Use request.get_json() para dados JSON
+        if not data:
+            return jsonify({"sucesso": False, "erro": "Requisição sem corpo JSON."}), 400
+
+        username_email_input = data.get('username') # 'username' como no seu frontend
+        password = data.get('password')
+
+        if not username_email_input or not password:
+            return jsonify({"sucesso": False, "erro": "E-mail e senha são obrigatórios"}), 400
+        
+        user = check_user_credentials(username_email_input, password)
+        
+        if user:
+            response_data = {"sucesso": True, "mensagem": "Login bem-sucedido!", "usuario": user}
+            # Flask-CORS deve adicionar os cabeçalhos corretos aqui.
+            return jsonify(response_data), 200
+        else:
+            user_data_raw = get_user_from_firestore(username_email_input)
+            if user_data_raw and user_data_raw.get('status') == 'INATIVO':
+                return jsonify({"sucesso": False, "erro": "Esta conta de usuário está desativada."}), 403
+            return jsonify({"sucesso": False, "erro": "E-mail ou senha inválidos."}), 401
+    except Exception as e:
+        print(f"ERRO em /api/login: {e}")
+        traceback.print_exc()
+        return jsonify({"sucesso": False, "erro": f"Erro interno no servidor: {str(e)}"}), 500
 
 @app.route('/api/register', methods=['POST'])
 def register_client_user():
@@ -1391,9 +1474,6 @@ def update_status_sugestao_admin(id_sugestao):
         print(f"ERRO AO ATUALIZAR STATUS DA SUGESTÃO {id_sugestao}: {e}")
         traceback.print_exc()
         return jsonify({"erro": f"Erro interno ao atualizar status: {str(e)}"}), 500
-
-# --- Função para popular o Firestore com usuários de exemplo ---
-# (Mantenha sua função criar_usuarios_firestore_exemplo como está no seu main (2).py)
 
 if __name__ == '__main__':
     # if db: 
