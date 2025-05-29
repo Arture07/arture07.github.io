@@ -36,7 +36,7 @@ bucket = storage.bucket()
 origins = [
     "https://arture07.github.io"
 ]
-CORS(app, resources={r"/api/*": {"origins": origins}}, supports_credentials=True)
+CORS(app, resources={r"/api/*": {"origins": ["https://arture07.github.io"]}}, supports_credentials=True)
 
 # --- 4) Constantes do seu app ---
 FIREBASE_PROJECT_ID = "biblioteca-py-6b33e"
