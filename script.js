@@ -149,6 +149,8 @@ document.addEventListener('DOMContentLoaded', function() {
     const nextPageButton = document.getElementById('next-page-button');
     const pageInfoSpan = document.getElementById('page-info');
 
+    const backendUrl = 'https://shelfwise-backend-698679522199.southamerica-east1.run.app';
+
     if(document.getElementById('currentYear')) {
         document.getElementById('currentYear').textContent = new Date().getFullYear();
     }
@@ -302,7 +304,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         existingReviewsContainer.innerHTML = '<p class="text-sm text-gray-500 italic">Carregando avaliações...</p>';
         try {
-            const response = await fetch(`/api/livros/${livroId}/avaliacoes`);
+            const response = await fetch(`${backendUrl}/api/livros/${livroId}/avaliacoes`);
             if (!response.ok) {
                 if (response.status === 404) { 
                      existingReviewsContainer.innerHTML = '<p class="text-sm text-gray-500 italic no-reviews-message">Nenhuma avaliação ainda. Seja o primeiro a avaliar!</p>';
@@ -388,7 +390,7 @@ document.addEventListener('DOMContentLoaded', function() {
             botaoRenovarEspecifico.disabled = true;
         }
         try {
-            const response = await fetch(`/api/emprestimos/${idEmprestimo}/renovar`, { method: 'POST', headers: { 'Content-Type': 'application/json' } });
+            const response = await fetch(`${backendUrl}/api/emprestimos/${idEmprestimo}/renovar`, { method: 'POST', headers: { 'Content-Type': 'application/json' } });
             if (!response.ok) {
                 const errData = await response.json().catch(() => ({ erro: "Erro ao processar a renovação." }));
                 throw new Error(errData.erro || `Erro ${response.status} ao renovar empréstimo.`);
@@ -823,7 +825,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const searchTerm = searchInput ? searchInput.value.trim() : "";
         const selectedGenre = genreFilterSelect ? genreFilterSelect.value : "";
         
-        let apiUrl = `/api/livros?limit=${limitLivros}`;
+        let apiUrl = `${backendUrl}/api/livros?limit=${limitLivros}`;
         if (searchTerm) apiUrl += `&search=${encodeURIComponent(searchTerm)}`;
         if (selectedGenre) apiUrl += `&genre=${encodeURIComponent(selectedGenre)}`;
         
@@ -916,7 +918,7 @@ document.addEventListener('DOMContentLoaded', function() {
             showMessage("Você não tem permissão para editar livros.", "error");
             return;
         }
-        fetch(`/api/livros/${livroId}`)
+        fetch(`${backendUrl}/api/livros/${livroId}`)
             .then(response => {
                 if (!response.ok) throw new Error(`Erro ao buscar dados do livro: ${response.status}`);
                 return response.json();
@@ -960,7 +962,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 try {
                     const headers = {};
                     if (currentUser) { headers['X-User-Username'] = currentUser.username; headers['X-User-Role'] = currentUser.role; }
-                    const response = await fetch(`/api/livros/${livroId}`, { method: 'DELETE', headers: headers });
+                    const response = await fetch(`${backendUrl}/api/livros/${livroId}`, { method: 'DELETE', headers: headers });
                     if (!response.ok) {
                         const errData = await response.json().catch(() => ({erro: "Erro ao excluir livro."}));
                         throw new Error(errData.erro || `Erro ${response.status} ao excluir livro.`);
@@ -982,7 +984,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         if(myLoansContent) myLoansContent.innerHTML = `<div class="col-span-full text-center p-8">Carregando...</div>`;
         try {
-            const response = await fetch(`/api/meus_emprestimos?username=${encodeURIComponent(currentUser.username)}`);
+            const response = await fetch(`${backendUrl}/api/meus_emprestimos?username=${encodeURIComponent(currentUser.username)}`);
             if (response.status === 401) { logout(); throw new Error("Sessão expirada."); }
             if (!response.ok) {
                 const errData = await response.json().catch(() => ({}));
@@ -1371,7 +1373,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         if(loanHistoryContent) loanHistoryContent.innerHTML = `<div class="col-span-full text-center p-8">Carregando histórico...</div>`;
         try {
-            const response = await fetch(`/api/historico_emprestimos?username=${encodeURIComponent(currentUser.username)}`);
+            const response = await fetch(`${backendUrl}/api/historico_emprestimos?username=${encodeURIComponent(currentUser.username)}`);
             if (response.status === 401) { logout(); throw new Error("Sessão expirada."); }
             if (!response.ok) {
                 const errData = await response.json().catch(() => ({}));
@@ -1408,7 +1410,7 @@ document.addEventListener('DOMContentLoaded', function() {
     async function fetchUserWishlist() { 
         if (!currentUser) return;
         try {
-            const response = await fetch(`/api/wishlist?username=${encodeURIComponent(currentUser.username)}`);
+            const response = await fetch(`${backendUrl}/api/wishlist?username=${encodeURIComponent(currentUser.username)}`);
             if (!response.ok) throw new Error('Erro ao buscar lista de desejos.');
             const data = await response.json();
             userWishlist = data.map(item => item.id); 
@@ -1425,7 +1427,7 @@ document.addEventListener('DOMContentLoaded', function() {
         button.disabled = true; const originalHTML = button.innerHTML;
         button.innerHTML = `<svg class="animate-spin h-4 w-4 mr-1.5" ...></svg> ...`;
         try {
-            const response = await fetch(`/api/wishlist/${action}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: currentUser.username, livro_id: livroId }) });
+            const response = await fetch(`${backendUrl}/api/wishlist/${action}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: currentUser.username, livro_id: livroId }) });
             if (!response.ok) { const errData = await response.json().catch(() => ({})); throw new Error(errData.erro || `Erro.`); }
             const data = await response.json(); showMessage(data.mensagem, 'success');
             if (action === 'add') userWishlist.push(livroId); else userWishlist = userWishlist.filter(id => id !== livroId);
@@ -1447,7 +1449,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!currentUser) { if(wishlistContent) wishlistContent.innerHTML = '<p>Faça login para ver sua lista.</p>'; return; }
         if(wishlistContent) wishlistContent.innerHTML = `<div class="col-span-full text-center p-8">Carregando...</div>`;
         try {
-            const response = await fetch(`/api/wishlist?username=${encodeURIComponent(currentUser.username)}`);
+            const response = await fetch(`${backendUrl}/api/wishlist?username=${encodeURIComponent(currentUser.username)}`);
             if (!response.ok) throw new Error('Erro ao buscar lista de desejos.');
             const wishlistComDetalhes = await response.json();
             userWishlist = wishlistComDetalhes.map(livro => livro.id); 
@@ -1478,7 +1480,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (btnDev) { originalBtnText = btnDev.innerHTML; btnDev.innerHTML = `Registrando...`; btnDev.disabled = true; } 
                 else { showMessage("Registrando...", "info"); }
                 try {
-                    const response = await fetch('/api/registrar_devolucao', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id_emprestimo: idEmprestimo }) });
+                    const response = await fetch(`${backendUrl}/api/registrar_devolucao`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id_emprestimo: idEmprestimo }) });
                     if (!response.ok) { const err = await response.json().catch(() => ({})); throw new Error(err.erro || `Erro.`); }
                     const data = await response.json(); showMessage(data.mensagem || "Devolução registrada!", "success");
                     closeLoanDetailModal();
@@ -1496,7 +1498,7 @@ document.addEventListener('DOMContentLoaded', function() {
     async function popularFiltroGeneros() { 
         if (!genreFilterSelect) return;
         try {
-            const response = await fetch('/api/generos');
+            const response = await fetch(`${backendUrl}/api/generos`);
             if (!response.ok) throw new Error('Erro ao buscar gêneros.');
             const generosDaApi = await response.json();
             while (genreFilterSelect.options.length > 1) genreFilterSelect.remove(1);
@@ -1548,7 +1550,7 @@ document.addEventListener('DOMContentLoaded', function() {
         submitSuggestionButton.disabled = true;
         submitSuggestionButton.innerHTML = `Enviando...`;
         try {
-            const response = await fetch('/api/sugestoes', {
+            const response = await fetch(`${backendUrl}/api/sugestoes`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(sugestao)
@@ -1579,7 +1581,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 headers['X-User-Username'] = currentUser.username;
                 headers['X-User-Role'] = currentUser.role;
             }
-            const response = await fetch(`/api/sugestoes/minhas?username=${encodeURIComponent(currentUser.username)}`, { headers });
+            const response = await fetch(`${backendUrl}/api/sugestoes/minhas?username=${encodeURIComponent(currentUser.username)}`, { headers });
             if (!response.ok) {
                 const err = await response.json().catch(() => ({}));
                 throw new Error(err.erro || `Erro ${response.status} ao buscar suas sugestões.`);
@@ -1643,7 +1645,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const originalBtnText = fetchIsbnInfoButton.innerHTML;
             fetchIsbnInfoButton.innerHTML = `Buscando...`; fetchIsbnInfoButton.disabled = true;
             try {
-                const response = await fetch(`/api/isbn_lookup?isbn=${encodeURIComponent(isbn)}`);
+                const response = await fetch(`${backendUrl}/api/isbn_lookup?isbn=${encodeURIComponent(isbn)}`);
                 if (!response.ok) { const err = await response.json().catch(() => ({})); throw new Error(err.erro || `Erro.`);}
                 const data = await response.json();
                 if (data.sucesso && data.livro) {
@@ -1684,7 +1686,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             try {
                 const headers = {}; if (currentUser) { headers['X-User-Username'] = currentUser.username; headers['X-User-Role'] = currentUser.role; }
-                const response = await fetch('/api/livros', { method: 'POST', body: formData, headers: headers });
+                const response = await fetch(`${backendUrl}/api/livros`, { method: 'POST', body: formData, headers: headers });
                 if (response.status === 401) { logout(); throw new Error("Sessão expirada."); }
                 if (!response.ok) { const err = await response.json().catch(() => ({})); throw new Error(err.erro || `Erro HTTP ${response.status}`); }
                 const data = await response.json(); showMessage(data.mensagem || 'Livro adicionado!', 'success'); 
@@ -1708,7 +1710,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             try {
                 const headers = {}; if (currentUser) { headers['X-User-Username'] = currentUser.username; headers['X-User-Role'] = currentUser.role; }
-                const response = await fetch(`/api/livros/${selectedBookForEdit.id}`, { method: 'PUT', body: formData, headers: headers });
+                const response = await fetch(`${backendUrl}/api/livros/${selectedBookForEdit.id}`, { method: 'PUT', body: formData, headers: headers });
                 if (response.status === 401) { logout(); throw new Error("Sessão expirada."); }
                 if (!response.ok) { const err = await response.json().catch(() => ({})); throw new Error(err.erro || `Erro HTTP ${response.status}`);}
                 const data = await response.json(); showMessage(data.mensagem || 'Livro atualizado!', 'success');
@@ -1732,7 +1734,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const originalBtnContent = submitLendButton.innerHTML; submitLendButton.innerHTML = `Confirmando...`; submitLendButton.disabled = true;
             try {
                 const headers = {}; if (currentUser) { headers['X-User-Username'] = currentUser.username; headers['X-User-Role'] = currentUser.role; }
-                const response = await fetch('/api/emprestar_livro', { method: 'POST', headers: {'Content-Type': 'application/json', ...headers}, body: JSON.stringify(emprestimoDados) });
+                const response = await fetch(`${backendUrl}/api/emprestar_livro`, { method: 'POST', headers: {'Content-Type': 'application/json', ...headers}, body: JSON.stringify(emprestimoDados) });
                 if (response.status === 401) { logout(); throw new Error("Sessão expirada."); }
                 if (!response.ok) { const err = await response.json().catch(() => ({})); throw new Error(err.erro || `Erro ${response.status}`); }
                 const data = await response.json(); showMessage(data.mensagem || "Empréstimo registrado!", "success"); 
@@ -1752,7 +1754,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const originalBtnText = submitReviewButton.textContent; submitReviewButton.innerHTML = `Enviando...`; submitReviewButton.disabled = true;
             try {
                 const headers = {'Content-Type': 'application/json'}; if (currentUser) { headers['X-User-Username'] = currentUser.username; headers['X-User-Role'] = currentUser.role; }
-                const response = await fetch(`/api/livros/${selectedBookForDetail.id}/avaliacoes`, { method: 'POST', headers: headers, body: JSON.stringify({ cliente_username: currentUser.username, nota: nota, comentario: comentario }) });
+                const response = await fetch(`${backendUrl}/api/livros/${selectedBookForDetail.id}/avaliacoes`, { method: 'POST', headers: headers, body: JSON.stringify({ cliente_username: currentUser.username, nota: nota, comentario: comentario }) });
                 submitReviewButton.textContent = originalBtnText; submitReviewButton.disabled = false; 
                 if (!response.ok) { const errData = await response.json().catch(() => ({})); throw new Error(errData.erro || `Erro.`); }
                 const data = await response.json(); showMessage(data.mensagem || "Avaliação enviada!", "success");
