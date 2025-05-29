@@ -19,6 +19,9 @@ document.addEventListener('DOMContentLoaded', function() {
     const emprestimosAtrasadosTableBody = document.getElementById('emprestimosAtrasadosTableBody');
     const noEmprestimosAtrasadosMessage = document.getElementById('noEmprestimosAtrasadosMessage');
 
+    const backendUrl = 'https://shelfwise-backend-698679522199.southamerica-east1.run.app'; // SUA URL DO CLOUD RUN
+
+
     let currentUser = null;
     let livrosChart = null;
     let generosChart = null;
@@ -183,7 +186,7 @@ document.addEventListener('DOMContentLoaded', function() {
     async function fetchLivrosMaisEmprestados() {
         if(livrosMaisEmprestadosLoading) livrosMaisEmprestadosLoading.classList.remove('hidden');
         try {
-            const response = await fetch('/api/admin/relatorios/livros-mais-emprestados');
+            const response = await fetch(`${backendUrl}/api/admin/relatorios/livros-mais-emprestados`);
             if (!response.ok) throw new Error('Falha ao buscar dados de livros mais emprestados.');
             const dados = await response.json();
             
@@ -202,7 +205,7 @@ document.addEventListener('DOMContentLoaded', function() {
     async function fetchGenerosMaisPopulares() {
         if(generosMaisPopularesLoading) generosMaisPopularesLoading.classList.remove('hidden');
         try {
-            const response = await fetch('/api/admin/relatorios/generos-mais-populares');
+            const response = await fetch(`${backendUrl}/api/admin/relatorios/generos-mais-populares`);
             if (!response.ok) throw new Error('Falha ao buscar dados de gêneros mais populares.');
             const dados = await response.json();
 
@@ -221,7 +224,7 @@ document.addEventListener('DOMContentLoaded', function() {
     async function fetchEmprestimosPorPeriodo() {
         if(emprestimosPorPeriodoLoading) emprestimosPorPeriodoLoading.classList.remove('hidden');
         try {
-            const response = await fetch('/api/admin/relatorios/emprestimos-por-periodo?dias=30'); // Padrão 30 dias
+            const response = await fetch(`${backendUrl}/api/admin/relatorios/emprestimos-por-periodo?dias=30`); // Padrão 30 dias
             if (!response.ok) throw new Error('Falha ao buscar dados de empréstimos por período.');
             const dados = await response.json();
 
@@ -243,7 +246,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if(noEmprestimosAtrasadosMessage) noEmprestimosAtrasadosMessage.classList.add('hidden');
 
         try {
-            const response = await fetch('/api/admin/relatorios/emprestimos-atrasados');
+            const response = await fetch(`${backendUrl}/api/admin/relatorios/emprestimos-atrasados`);
             if (!response.ok) throw new Error('Falha ao buscar empréstimos atrasados.');
             const dados = await response.json();
             renderTabelaAtrasados(dados);

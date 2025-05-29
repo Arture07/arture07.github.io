@@ -26,6 +26,8 @@ document.addEventListener('DOMContentLoaded', function() {
     const cancelFeedbackButton = document.getElementById('cancelSuggestionFeedbackButton');
     // const confirmFeedbackButton = document.getElementById('confirmSuggestionFeedbackButton'); // É o submit do form
 
+    const backendUrl = 'https://shelfwise-backend-698679522199.southamerica-east1.run.app'; // SUA URL DO CLOUD RUN
+
     let currentUser = null;
     let allSuggestionsCache = [];
 
@@ -103,7 +105,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 headers['X-User-Username'] = currentUser.username; // Simulação para backend
                 headers['X-User-Role'] = currentUser.role;       // Simulação para backend
             }
-            const response = await fetch('/api/admin/sugestoes', { headers });
+            const response = await fetch(`${backendUrl}/api/admin/sugestoes`, { headers });
             if (!response.ok) {
                 const err = await response.json().catch(() => ({}));
                 throw new Error(err.erro || `Erro HTTP ${response.status}`);
@@ -217,7 +219,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const headers = {'Content-Type': 'application/json'};
             if(currentUser) { headers['X-User-Username'] = currentUser.username; headers['X-User-Role'] = currentUser.role; }
 
-            const response = await fetch(`/api/admin/sugestoes/${suggestionId}/status`, {
+            const response = await fetch(`${backendUrl}/api/admin/sugestoes/${suggestionId}/status`, {
                 method: 'PUT',
                 headers: headers,
                 body: JSON.stringify({ status_sugestao: newStatus, admin_feedback: adminFeedback })

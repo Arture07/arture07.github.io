@@ -65,6 +65,8 @@ document.addEventListener('DOMContentLoaded', function() {
     const cancelExemptFineButton = document.getElementById('cancelExemptFineButton');
     const exemptFineModalOverlay = exemptFineModal ? exemptFineModal.querySelector('.modal-overlay-exempt-fine') : null;
 
+    const backendUrl = 'https://shelfwise-backend-698679522199.southamerica-east1.run.app'; // SUA URL DO CLOUD RUN
+
     let currentUser = null;
     let allLoansCache = []; 
     let selectedLoanForModal = null;
@@ -483,7 +485,7 @@ document.addEventListener('DOMContentLoaded', function() {
         try {
             const headers = {'Content-Type': 'application/json'};
             if(currentUser) { headers['X-User-Username'] = currentUser.username; headers['X-User-Role'] = currentUser.role; }
-            const response = await fetch('/api/registrar_devolucao', { method: 'POST', headers: headers, body: JSON.stringify({ id_emprestimo: idEmprestimo }) });
+            const response = await fetch(`${backendUrl}/api/registrar_devolucao`, { method: 'POST', headers: headers, body: JSON.stringify({ id_emprestimo: idEmprestimo }) });
             const result = await response.json();
             if (!response.ok) throw new Error(result.erro || `Erro ${response.status}`);
             showMessage(result.mensagem || "Devolução registrada!", "success");
@@ -504,7 +506,7 @@ document.addEventListener('DOMContentLoaded', function() {
             try {
                 const headers = {'Content-Type': 'application/json'};
                 if(currentUser) { headers['X-User-Username'] = currentUser.username; headers['X-User-Role'] = currentUser.role; }
-                const response = await fetch(`/api/admin/emprestimos/${idEmprestimo}/pagar-multa`, { method: 'POST', headers: headers });
+                const response = await fetch(`${backendUrl}/api/admin/emprestimos/${idEmprestimo}/pagar-multa`, { method: 'POST', headers: headers });
                 const result = await response.json();
                 if (!response.ok) throw new Error(result.erro || `Erro ${response.status}`);
                 showMessage(result.mensagem, "success");
@@ -535,7 +537,7 @@ document.addEventListener('DOMContentLoaded', function() {
         try {
             const headers = {'Content-Type': 'application/json'};
             if(currentUser) { headers['X-User-Username'] = currentUser.username; headers['X-User-Role'] = currentUser.role; }
-            const response = await fetch(`/api/admin/emprestimos/${loanId}/isentar-multa`, {
+            const response = await fetch(`${backendUrl}/api/admin/emprestimos/${loanId}/isentar-multa`, {
                 method: 'POST',
                 headers: headers,
                 body: JSON.stringify({ justificativa: justificativa })

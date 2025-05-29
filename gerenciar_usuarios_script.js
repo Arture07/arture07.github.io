@@ -40,6 +40,8 @@ document.addEventListener('DOMContentLoaded', function() {
     const confirmResetPasswordButton = document.getElementById('confirmResetPassword');
     const resetPasswordModalOverlay = resetPasswordModal ? resetPasswordModal.querySelector('.modal-overlay-reset') : null;
     
+    const backendUrl = 'https://shelfwise-backend-698679522199.southamerica-east1.run.app'; // SUA URL DO CLOUD RUN
+
     let currentUser = null;
     let isEditMode = false; 
     let allUsersCache = []; // Cache para todos os usuários carregados
@@ -114,7 +116,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 headers['X-User-Username'] = currentUser.username;
                 headers['X-User-Role'] = currentUser.role;
             }
-            const response = await fetch('/api/admin/usuarios', { headers: headers });
+            const response = await fetch(`${backendUrl}/api/admin/usuarios`, { headers: headers });
             if (!response.ok) {
                  const errorData = await response.json().catch(()=> ({erro: `Erro HTTP ${response.status}`}));
                  throw new Error(errorData.erro || 'Falha ao buscar usuários.');
@@ -326,7 +328,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         if (actionText === 'desativar') { 
             try {
-                const response = await fetch(`/api/admin/usuarios/${userId}`, { method: 'DELETE', headers: headers }); 
+                const response = await fetch(`${backendUrl}/api/admin/usuarios/${userId}`, { method: 'DELETE', headers: headers }); 
                 const result = await response.json();
                 if (!response.ok) throw new Error(result.erro || 'Erro ao desativar usuário.');
                 showMessage(result.mensagem, 'success');
@@ -336,7 +338,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         } else { 
              try {
-                const response = await fetch(`/api/admin/usuarios/${userId}`, { 
+                const response = await fetch(`${backendUrl}/api/admin/usuarios/${userId}`, { 
                     method: 'PUT',
                     headers: headers,
                     body: JSON.stringify({ status: newStatus }) 
@@ -370,7 +372,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         try {
-            const response = await fetch(`/api/admin/usuarios/${userId}/resetar-senha`, {
+            const response = await fetch(`${backendUrl}/api/admin/usuarios/${userId}/resetar-senha`, {
                 method: 'POST',
                 headers: headers,
                 body: JSON.stringify({ password: newPasswordValue })
