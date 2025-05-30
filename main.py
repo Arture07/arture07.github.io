@@ -105,31 +105,6 @@ def ensure_firebase_initialized(f):
         return f(*args, **kwargs)
     return decorated_function
 
-"""if cred: # Só tenta inicializar se as credenciais foram carregadas
-    try:
-        if not firebase_admin._apps:
-            firebase_admin.initialize_app(cred, {
-                'storageBucket': STORAGE_BUCKET_NAME_CONST
-            })
-            print("Firebase Admin SDK inicializado.")
-        else:
-            print("Firebase Admin SDK já estava inicializado.")
-        db = firestore.client()
-        bucket = storage.bucket(name=STORAGE_BUCKET_NAME_CONST) # Especifica o nome do bucket
-        
-        if db: print("Cliente Firestore obtido.")
-        else: print("ERRO: Cliente Firestore não pôde ser obtido após inicialização.")
-        if bucket: print(f"Bucket do Firebase Storage '{STORAGE_BUCKET_NAME_CONST}' conectado.")
-        else: print("ERRO: Bucket do Firebase Storage não pôde ser obtido após inicialização.")
-
-    except Exception as e_init:
-        print(f"ERRO CRÍTICO ao inicializar serviços Firebase após carregar credenciais: {e_init}")
-        traceback.print_exc()
-        db = None
-        bucket = None
-else:
-    print("ERRO: Credenciais do Firebase não foram carregadas. Serviços Firebase não serão inicializados.")"""
-
 
 # --- 3) Configurar CORS após criar o `app` ---
 # A origem DEVE ser específica quando supports_credentials=True.
@@ -581,8 +556,8 @@ def get_livros():
         }
         
         return jsonify({
-        "livros": [{"id": "1", "titulo": "Livro Teste"}],
-        "pagination": {"has_next_page": False, "next_page_cursor": None}
+        "livros": livros_para_retornar,
+        "pagination": pagination_info
         }), 200
 
     except ValueError as ve: 
