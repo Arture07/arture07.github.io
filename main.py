@@ -13,54 +13,99 @@ import traceback
 from flask_cors import CORS
 from google.cloud import secretmanager
 
+import time
+initialization_start_time = time.time()
+
 # --- 0) Configurações iniciais e instanciação do Flask ---
 app = Flask(__name__, static_folder='src', static_url_path='')
+print(f"Flask app instanciado em {time.time() - initialization_start_time:.4f} segundos.")
 
-# --- 1) Carregar credenciais do Secret Manager ---
-project_id = os.environ.get("GOOGLE_CLOUD_PROJECT")
-secret_name = os.environ.get("SECRET_NAME", "firebase-sa-json")
-secret_client = secretmanager.SecretManagerServiceClient()
-secret_path = f"projects/{project_id}/secrets/{secret_name}/versions/latest"
-secret_response = secret_client.access_secret_version(request={"name": secret_path})
-service_account_json = secret_response.payload.data.decode("UTF-8")
-cred = credentials.Certificate(json.loads(service_account_json))
+CORS(app, 
+     origins=["https://arture07.github.io", "http://localhost:8080", "http://127.0.0.1:8080"], # Adicione localhost para teste local
+     methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+     allow_headers=["Content-Type", "Authorization"], # Adicione outros headers que seu frontend possa enviar
+     supports_credentials=True,
+     expose_headers=["Content-Type", "Authorization"] # Exponha headers se o frontend precisar lê-los
+)
 
-if project_id:
-    secret_path = f"projects/{project_id}/secrets/{secret_name}/versions/latest"
-    try:
-        secret_response = secret_client.access_secret_version(request={"name": secret_path})
-        service_account_info = json.loads(secret_response.payload.data.decode("UTF-8"))
-        cred = credentials.Certificate(service_account_info)
-        print("Credenciais do Firebase carregadas do Secret Manager.")
-    except Exception as e:
-        print(f"ERRO ao carregar credenciais do Secret Manager: {e}")
-        traceback.print_exc()
-        # Fallback para arquivo local se o Secret Manager falhar ( útil para desenvolvimento local)
-        print("Tentando carregar credenciais de arquivo local como fallback...")
-        chave_json_path_local = os.path.join(os.path.dirname(__file__), "biblioteca-py-6b33e-firebase-adminsdk-fbsvc-bd95a47a25.json") # Nome do seu arquivo local
-        if os.path.exists(chave_json_path_local):
-            cred = credentials.Certificate(chave_json_path_local)
-            print("Credenciais do Firebase carregadas de arquivo local (fallback).")
-        else:
-            print(f"ERRO: Arquivo de credencial local '{chave_json_path_local}' não encontrado. Firebase não pode ser inicializado.")
-            cred = None # Garante que o Firebase não será inicializado sem credenciais
-else:
-    # Desenvolvimento local ou ambiente onde GOOGLE_CLOUD_PROJECT não está setado
-    print("Variável de ambiente GOOGLE_CLOUD_PROJECT não encontrada. Tentando carregar credenciais de arquivo local.")
-    chave_json_path_local = os.path.join(os.path.dirname(__file__), "biblioteca-py-6b33e-firebase-adminsdk-fbsvc-bd95a47a25.json") # Nome do seu arquivo local
-    if os.path.exists(chave_json_path_local):
-        cred = credentials.Certificate(chave_json_path_local)
-        print("Credenciais do Firebase carregadas de arquivo local.")
-    else:
-        print(f"ERRO: Arquivo de credencial local '{chave_json_path_local}' não encontrado. Firebase não pode ser inicializado.")
-        cred = None
+print(f"CORS configurado em {time.time() - initialization_start_time:.4f} segundos.")
 
 db = None
 bucket = None
+firebase_initialized_successfully = False
 FIREBASE_PROJECT_ID_CONST = "biblioteca-py-6b33e" # Use uma constante para o ID do projeto
 STORAGE_BUCKET_NAME_CONST = f"{FIREBASE_PROJECT_ID_CONST}.appspot.com"
 
-if cred: # Só tenta inicializar se as credenciais foram carregadas
+# --- 1) Carregar credenciais do Secret Manager ---
+def initialize_firebase():
+    global db, bucket, firebase_initialized_successfully
+    if firebase_initialized_successfully: # Evita reinicialização
+        return
+
+    firebase_init_start_time = time.time()
+    cred = None
+    try:
+        # Tenta carregar do Secret Manager primeiro (para Cloud Run)
+        project_id = os.environ.get("GOOGLE_CLOUD_PROJECT")
+        if project_id:
+            print("Ambiente Cloud Run detectado. Tentando carregar segredo do Secret Manager...")
+            # Importa google.cloud.secretmanager APENAS se necessário
+            from google.cloud import secretmanager
+            secret_name = os.environ.get("SECRET_NAME", "firebase-sa-json") # Use seu nome de segredo
+            secret_client = secretmanager.SecretManagerServiceClient()
+            secret_path = f"projects/{project_id}/secrets/{secret_name}/versions/latest"
+            secret_response = secret_client.access_secret_version(request={"name": secret_path})
+            service_account_info = json.loads(secret_response.payload.data.decode("UTF-8"))
+            cred = credentials.Certificate(service_account_info)
+            print(f"Credenciais do Firebase carregadas do Secret Manager em {time.time() - firebase_init_start_time:.4f}s.")
+        else:
+            # Se não estiver no Cloud Run, tenta carregar de arquivo local
+            raise EnvironmentError("Não é ambiente Cloud Run (GOOGLE_CLOUD_PROJECT não definido).")
+
+    except Exception as e_sm:
+        print(f"AVISO: Falha ao carregar do Secret Manager ({type(e_sm).__name__}: {e_sm}). Tentando carregar de arquivo local...")
+        local_fallback_start_time = time.time()
+        # Coloque o nome exato do seu arquivo de credenciais aqui
+        chave_json_path_local = os.path.join(os.path.dirname(__file__), "biblioteca-py-6b33e-firebase-adminsdk-fbsvc-bd95a47a25.json")
+        if os.path.exists(chave_json_path_local):
+            cred = credentials.Certificate(chave_json_path_local)
+            print(f"Credenciais do Firebase carregadas de arquivo local em {time.time() - local_fallback_start_time:.4f}s.")
+        else:
+            print(f"ERRO FATAL: Arquivo de credencial local '{chave_json_path_local}' não encontrado.")
+            return # Não continua se não houver credenciais
+
+    if cred:
+        try:
+            if not firebase_admin._apps:
+                firebase_admin.initialize_app(cred, {'storageBucket': 'biblioteca-py-6b33e.appspot.com'}) # SEU BUCKET
+            db = firestore.client()
+            bucket = storage.bucket() # Se o nome do bucket for o padrão, não precisa de argumento
+            firebase_initialized_successfully = True
+            print(f"Firebase Admin SDK inicializado e clientes obtidos em {time.time() - firebase_init_start_time:.4f}s (total desde início do script).")
+        except Exception as e_init_sdk:
+            print(f"ERRO CRÍTICO ao inicializar Firebase Admin SDK: {e_init_sdk}")
+            traceback.print_exc()
+    else:
+        print("ERRO FATAL: Nenhuma credencial do Firebase foi carregada.")
+        
+from functools import wraps
+def ensure_firebase_initialized(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not firebase_initialized_successfully:
+            # Tenta inicializar se ainda não foi (pode ser a primeira requisição)
+            initialize_firebase()
+            if not firebase_initialized_successfully:
+                 # Log mais detalhado do erro aqui, se necessário
+                print("ERRO: Firebase não pôde ser inicializado. Verifique os logs anteriores para detalhes sobre credenciais.")
+                return jsonify({"sucesso": False, "erro": "Erro crítico: O servidor não pôde se conectar aos serviços de banco de dados."}), 503 # Service Unavailable
+        if not db: # Verificação adicional
+            print("ERRO: Conexão com Firestore (db) não está disponível mesmo após tentativa de inicialização.")
+            return jsonify({"sucesso": False, "erro": "Erro crítico: Conexão com o banco de dados (Firestore) perdida."}), 503
+        return f(*args, **kwargs)
+    return decorated_function
+
+"""if cred: # Só tenta inicializar se as credenciais foram carregadas
     try:
         if not firebase_admin._apps:
             firebase_admin.initialize_app(cred, {
@@ -83,19 +128,12 @@ if cred: # Só tenta inicializar se as credenciais foram carregadas
         db = None
         bucket = None
 else:
-    print("ERRO: Credenciais do Firebase não foram carregadas. Serviços Firebase não serão inicializados.")
+    print("ERRO: Credenciais do Firebase não foram carregadas. Serviços Firebase não serão inicializados.")"""
 
 
 # --- 3) Configurar CORS após criar o `app` ---
 # A origem DEVE ser específica quando supports_credentials=True.
 # Não use wildcard '*' com credentials.
-CORS(app, 
-     origins=["https://arture07.github.io", "http://localhost:8080", "http://127.0.0.1:8080"], # Adicione localhost para teste local
-     methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-     allow_headers=["Content-Type", "Authorization"], # Adicione outros headers que seu frontend possa enviar
-     supports_credentials=True,
-     expose_headers=["Content-Type", "Authorization"] # Exponha headers se o frontend precisar lê-los
-)
 
 @app.before_request
 def handle_preflight():
@@ -159,14 +197,14 @@ def get_user_from_firestore(username_email):
         return None
 
 def check_user_credentials(username_email, password):
-    user_data = get_user_from_firestore(username_email) 
-    if user_data and user_data.get('status') == 'ATIVO':
+    user = get_user_from_firestore(username_email) 
+    if user and user.get('status') == 'ATIVO':
         # Verifica se 'password_hash' existe e não é None antes de chamar check_password_hash
-        password_hash_from_db = user_data.get('password_hash')
+        password_hash_from_db = user.get('password_hash')
         if password_hash_from_db and check_password_hash(password_hash_from_db, password):
-            return {"username": user_data.get('username'), 
-                    "role": user_data.get("role", "cliente"), 
-                    "nome": user_data.get("nome", user_data.get('username'))}
+            return {"username": user.get('username'), 
+                    "role": user.get("role", "cliente"), 
+                    "nome": user.get("nome", user.get('username'))}
     
     username_email_lower = str(username_email).lower()
     if username_email_lower in USUARIOS_EXEMPLO:
@@ -183,6 +221,21 @@ def check_user_credentials(username_email, password):
 @app.route('/')
 def index_page_serve(): 
     return send_from_directory(app.static_folder, 'index.html')
+
+@app.route('/<path:filename>')
+def serve_static(filename='index.html'):
+    # Verifica se o arquivo pedido existe na pasta estática
+    file_path = os.path.join(app.static_folder, filename)
+    if os.path.exists(file_path) and os.path.isfile(file_path):
+        return send_from_directory(app.static_folder, filename)
+    # Se for uma rota de SPA e o arquivo não for encontrado, serve o index.html
+    # Isso é útil se você estiver usando roteamento no lado do cliente.
+    # Se não, pode retornar um 404.
+    if not '.' in filename: # Heurística simples para detectar rotas de SPA vs arquivos diretos
+        index_path = os.path.join(app.static_folder, 'index.html')
+        if os.path.exists(index_path):
+            return send_from_directory(app.static_folder, 'index.html')
+    return jsonify({"erro": "Arquivo não encontrado"}), 404
 
 @app.route('/login.html')
 def login_page(): 
@@ -210,28 +263,26 @@ def manage_suggestions_page_route():
 
 # --- API Endpoints ---
 @app.route('/api/login', methods=['POST', 'OPTIONS'])
-def login_api(): 
+@ensure_firebase_initialized # Garante que o Firebase está pronto
+def login_api():
+    login_start_time = time.time()
     try:
-        data = request.get_json() # Use request.get_json() para dados JSON
+        data = request.get_json()
         if not data:
             return jsonify({"sucesso": False, "erro": "Requisição sem corpo JSON."}), 400
-
-        username_email_input = data.get('username') # 'username' como no seu frontend
+        username_email_input = data.get('username')
         password = data.get('password')
-
         if not username_email_input or not password:
             return jsonify({"sucesso": False, "erro": "E-mail e senha são obrigatórios"}), 400
-        
+
         user = check_user_credentials(username_email_input, password)
-        
+
         if user:
-            response_data = {"sucesso": True, "mensagem": "Login bem-sucedido!", "usuario": user}
-            # Flask-CORS deve adicionar os cabeçalhos corretos aqui.
-            return jsonify(response_data), 200
+            print(f"Login bem-sucedido para {username_email_input} em {time.time() - login_start_time:.4f}s")
+            return jsonify({"sucesso": True, "mensagem": "Login bem-sucedido!", "usuario": user}), 200
         else:
-            user_data_raw = get_user_from_firestore(username_email_input)
-            if user_data_raw and user_data_raw.get('status') == 'INATIVO':
-                return jsonify({"sucesso": False, "erro": "Esta conta de usuário está desativada."}), 403
+            # Considerar loggar tentativas de login falhas se necessário
+            print(f"Falha no login para {username_email_input} em {time.time() - login_start_time:.4f}s")
             return jsonify({"sucesso": False, "erro": "E-mail ou senha inválidos."}), 401
     except Exception as e:
         print(f"ERRO em /api/login: {e}")
@@ -443,6 +494,7 @@ def adicionar_livro():
         return jsonify({"erro": f"Erro interno ao adicionar livro: {str(e)}"}), 500
 
 @app.route('/api/livros', methods=['GET'])
+@ensure_firebase_initialized
 def get_livros():
     if not db: 
         return jsonify({"erro": "Sistema indisponível.", "livros": [], "pagination": {}}), 503
@@ -528,7 +580,10 @@ def get_livros():
             "items_on_page": len(livros_para_retornar)
         }
         
-        return jsonify({"livros": livros_para_retornar, "pagination": pagination_info}), 200
+        return jsonify({
+        "livros": [{"id": "1", "titulo": "Livro Teste"}],
+        "pagination": {"has_next_page": False, "next_page_cursor": None}
+        }), 200
 
     except ValueError as ve: 
         print(f"ERRO ValueError em GET /api/livros: {ve}"); traceback.print_exc()
