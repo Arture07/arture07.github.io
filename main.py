@@ -39,69 +39,64 @@ STORAGE_BUCKET_NAME_CONST = f"{FIREBASE_PROJECT_ID_CONST}.appspot.com"
 # --- 1) Carregar credenciais do Secret Manager ---
 def initialize_firebase():
     global db, bucket, firebase_initialized_successfully
-    if firebase_initialized_successfully: # Evita reinicialização
+    if firebase_initialized_successfully:
         return
 
     firebase_init_start_time = time.time()
+    print("[FIREBASE_INIT] Iniciando inicialização do Firebase...")
     cred = None
     try:
-        # Tenta carregar do Secret Manager primeiro (para Cloud Run)
         project_id = os.environ.get("GOOGLE_CLOUD_PROJECT")
         if project_id:
-            print("Ambiente Cloud Run detectado. Tentando carregar segredo do Secret Manager...")
-            # Importa google.cloud.secretmanager APENAS se necessário
-            from google.cloud import secretmanager
-            secret_name = os.environ.get("SECRET_NAME", "firebase-sa-json") # Use seu nome de segredo
+            print("[FIREBASE_INIT] Ambiente Cloud Run. Tentando Secret Manager...")
+            from google.cloud import secretmanager # Importa apenas quando necessário
+            secret_name = os.environ.get("SECRET_NAME", "firebase-sa-json")
             secret_client = secretmanager.SecretManagerServiceClient()
             secret_path = f"projects/{project_id}/secrets/{secret_name}/versions/latest"
             secret_response = secret_client.access_secret_version(request={"name": secret_path})
             service_account_info = json.loads(secret_response.payload.data.decode("UTF-8"))
             cred = credentials.Certificate(service_account_info)
-            print(f"Credenciais do Firebase carregadas do Secret Manager em {time.time() - firebase_init_start_time:.4f}s.")
+            print(f"[FIREBASE_INIT] Credenciais carregadas do Secret Manager em {time.time() - firebase_init_start_time:.4f}s.")
         else:
-            # Se não estiver no Cloud Run, tenta carregar de arquivo local
-            raise EnvironmentError("Não é ambiente Cloud Run (GOOGLE_CLOUD_PROJECT não definido).")
-
+            raise EnvironmentError("GOOGLE_CLOUD_PROJECT não definido (não é Cloud Run).")
     except Exception as e_sm:
-        print(f"AVISO: Falha ao carregar do Secret Manager ({type(e_sm).__name__}: {e_sm}). Tentando carregar de arquivo local...")
-        local_fallback_start_time = time.time()
-        # Coloque o nome exato do seu arquivo de credenciais aqui
+        print(f"[FIREBASE_INIT_WARN] Falha Secret Manager ({type(e_sm).__name__}: {e_sm}). Tentando arquivo local...")
+        # SEU ARQUIVO DE CREDENCIAIS LOCAL
         chave_json_path_local = os.path.join(os.path.dirname(__file__), "biblioteca-py-6b33e-firebase-adminsdk-fbsvc-bd95a47a25.json")
         if os.path.exists(chave_json_path_local):
             cred = credentials.Certificate(chave_json_path_local)
-            print(f"Credenciais do Firebase carregadas de arquivo local em {time.time() - local_fallback_start_time:.4f}s.")
+            print(f"[FIREBASE_INIT] Credenciais carregadas de arquivo local.")
         else:
-            print(f"ERRO FATAL: Arquivo de credencial local '{chave_json_path_local}' não encontrado.")
-            return # Não continua se não houver credenciais
+            print(f"[FIREBASE_INIT_FATAL] Arquivo local '{chave_json_path_local}' não encontrado.")
+            return
 
     if cred:
         try:
             if not firebase_admin._apps:
-                firebase_admin.initialize_app(cred, {'storageBucket': 'biblioteca-py-6b33e.appspot.com'}) # SEU BUCKET
+                firebase_admin.initialize_app(cred, {'storageBucket': 'biblioteca-py-6b33e.appspot.com'}) # SEU BUCKET ID
             db = firestore.client()
-            bucket = storage.bucket() # Se o nome do bucket for o padrão, não precisa de argumento
+            # bucket = storage.bucket() # Inicialize o bucket apenas se for usado por rotas não-login ou adie
             firebase_initialized_successfully = True
-            print(f"Firebase Admin SDK inicializado e clientes obtidos em {time.time() - firebase_init_start_time:.4f}s (total desde início do script).")
+            print(f"[FIREBASE_INIT] Firebase SDK inicializado. 'db' está configurado. Tempo total: {time.time() - firebase_init_start_time:.4f}s.")
         except Exception as e_init_sdk:
-            print(f"ERRO CRÍTICO ao inicializar Firebase Admin SDK: {e_init_sdk}")
+            print(f"[FIREBASE_INIT_FATAL] Erro ao inicializar Firebase SDK: {e_init_sdk}")
+            import traceback
             traceback.print_exc()
     else:
-        print("ERRO FATAL: Nenhuma credencial do Firebase foi carregada.")
+        print("[FIREBASE_INIT_FATAL] Nenhuma credencial Firebase carregada.")
         
 from functools import wraps
 def ensure_firebase_initialized(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
         if not firebase_initialized_successfully:
-            # Tenta inicializar se ainda não foi (pode ser a primeira requisição)
-            initialize_firebase()
+            initialize_firebase() # Tenta inicializar
             if not firebase_initialized_successfully:
-                 # Log mais detalhado do erro aqui, se necessário
-                print("ERRO: Firebase não pôde ser inicializado. Verifique os logs anteriores para detalhes sobre credenciais.")
-                return jsonify({"sucesso": False, "erro": "Erro crítico: O servidor não pôde se conectar aos serviços de banco de dados."}), 503 # Service Unavailable
-        if not db: # Verificação adicional
-            print("ERRO: Conexão com Firestore (db) não está disponível mesmo após tentativa de inicialização.")
-            return jsonify({"sucesso": False, "erro": "Erro crítico: Conexão com o banco de dados (Firestore) perdida."}), 503
+                print("[API_ERROR] Firebase não inicializado. Rota não pode prosseguir.")
+                return jsonify({"sucesso": False, "erro": "Erro crítico do servidor: Falha na conexão com serviços essenciais."}), 503
+        if not db: # Double check
+             print("[API_ERROR] Conexão Firestore (db) indisponível. Rota não pode prosseguir.")
+             return jsonify({"sucesso": False, "erro": "Erro crítico do servidor: Conexão com banco de dados perdida."}), 503
         return f(*args, **kwargs)
     return decorated_function
 
@@ -149,64 +144,79 @@ if os.getenv("FLASK_ENV") == "development":
     try:
         print("Firebase Admin SDK inicializado com Secret Manager.")
         print("Firestore client:", "OK" if db else "NÃO")
-        print("Storage bucket:", STORAGE_BUCKET_NAME, "OK" if bucket else "NÃO")
+        print("Storage bucket:", STORAGE_BUCKET_NAME_CONST, "OK" if bucket else "NÃO")
     except Exception:
         traceback.print_exc()
 
 # --- Funções de Usuário e Autenticação ---
 def get_user_from_firestore(username_email):
-    if not db: 
-        print("DEBUG get_user_from_firestore: db is None")
+    if not db:
+        print("[GET_USER_ERROR] db não disponível em get_user_from_firestore")
         return None
     try:
         username_lower = str(username_email).lower()
-        user_ref = db.collection('usuarios').document(username_lower).get()
-        if user_ref.exists:
-            user_data = user_ref.to_dict(); user_data['id'] = user_ref.id 
-            user_data['username'] = username_lower 
+        user_ref = db.collection('usuarios').document(username_lower)
+        user_doc = user_ref.get()
+        if user_doc.exists:
+            user_data = user_doc.to_dict()
+            user_data['id'] = user_doc.id
+            user_data['username'] = username_lower # Garante consistência
             return user_data
         return None
-    except Exception as e: 
-        print(f"DEBUG: Erro em get_user_from_firestore para '{username_email}': {e}")
-        traceback.print_exc()
+    except Exception as e:
+        print(f"[GET_USER_ERROR] Exceção ao buscar usuário '{username_email}': {e}")
         return None
 
 def check_user_credentials(username_email, password):
-    user = get_user_from_firestore(username_email) 
-    if user and user.get('status') == 'ATIVO':
-        # Verifica se 'password_hash' existe e não é None antes de chamar check_password_hash
-        password_hash_from_db = user.get('password_hash')
+    print(f"[AUTH_ATTEMPT] Verificando credenciais para: {username_email}")
+    user_data = get_user_from_firestore(username_email)
+
+    if user_data:
+        if user_data.get('status') != 'ATIVO':
+            print(f"[AUTH_FAIL] Usuário '{username_email}' não está ATIVO. Status: {user_data.get('status')}")
+            return None # Usuário inativo
+
+        password_hash_from_db = user_data.get('password_hash')
         if password_hash_from_db and check_password_hash(password_hash_from_db, password):
-            return {"username": user.get('username'), 
-                    "role": user.get("role", "cliente"), 
-                    "nome": user.get("nome", user.get('username'))}
-    
-    username_email_lower = str(username_email).lower()
-    if username_email_lower in USUARIOS_EXEMPLO:
-        user_exemplo_data = USUARIOS_EXEMPLO[username_email_lower]
-        if 'password_hash' in user_exemplo_data and \
-           check_password_hash(user_exemplo_data['password_hash'], password) and \
-           user_exemplo_data.get('status', 'ATIVO') == 'ATIVO':
-            return {"username": username_email_lower, 
-                    "role": user_exemplo_data.get("role", "cliente"), 
-                    "nome": user_exemplo_data.get("nome", username_email_lower)}
-    return None
+            print(f"[AUTH_SUCCESS] Senha correta para '{username_email}'.")
+            return {
+                "username": user_data.get('username'),
+                "role": user_data.get("role", "cliente"),
+                "nome": user_data.get("nome", user_data.get('username'))
+            }
+        else:
+            print(f"[AUTH_FAIL] Senha incorreta para '{username_email}'. Hash do DB existe: {'Sim' if password_hash_from_db else 'Não'}")
+            return None # Senha incorreta ou hash ausente
+    else: # Fallback para USUARIOS_EXEMPLO (se ainda necessário)
+        username_lower = str(username_email).lower()
+        if username_lower in USUARIOS_EXEMPLO:
+            print(f"[AUTH_ATTEMPT_EXEMPLO] Usuário '{username_lower}' encontrado nos exemplos.")
+            user_exemplo_data = USUARIOS_EXEMPLO[username_lower]
+            if 'password_hash' in user_exemplo_data and \
+               check_password_hash(user_exemplo_data['password_hash'], password) and \
+               user_exemplo_data.get('status', 'ATIVO') == 'ATIVO':
+                print(f"[AUTH_SUCCESS_EXEMPLO] Login de exemplo bem-sucedido para '{username_lower}'.")
+                return {"username": username_lower,
+                        "role": user_exemplo_data.get("role", "cliente"),
+                        "nome": user_exemplo_data.get("nome", username_lower)}
+            else:
+                print(f"[AUTH_FAIL_EXEMPLO] Falha no login de exemplo para '{username_lower}'.")
+                return None
+        else:
+            print(f"[AUTH_FAIL] Usuário '{username_email}' não encontrado no Firestore nem nos exemplos.")
+            return None
 
 # --- Rotas da Aplicação (Servindo arquivos estáticos) ---
-@app.route('/')
+@"""app.route('/')
 def index_page_serve(): 
-    return send_from_directory(app.static_folder, 'index.html')
+    return send_from_directory(app.static_folder, 'index.html')"""
 
 @app.route('/<path:filename>')
 def serve_static(filename='index.html'):
-    # Verifica se o arquivo pedido existe na pasta estática
     file_path = os.path.join(app.static_folder, filename)
     if os.path.exists(file_path) and os.path.isfile(file_path):
         return send_from_directory(app.static_folder, filename)
-    # Se for uma rota de SPA e o arquivo não for encontrado, serve o index.html
-    # Isso é útil se você estiver usando roteamento no lado do cliente.
-    # Se não, pode retornar um 404.
-    if not '.' in filename: # Heurística simples para detectar rotas de SPA vs arquivos diretos
+    if not '.' in filename:
         index_path = os.path.join(app.static_folder, 'index.html')
         if os.path.exists(index_path):
             return send_from_directory(app.static_folder, 'index.html')
@@ -237,30 +247,35 @@ def manage_suggestions_page_route():
 
 
 # --- API Endpoints ---
-@app.route('/api/login', methods=['POST', 'OPTIONS'])
-@ensure_firebase_initialized # Garante que o Firebase está pronto
+@app.route('/api/login', methods=['POST']) # Flask-CORS lida com OPTIONS
+@ensure_firebase_initialized
 def login_api():
-    login_start_time = time.time()
+    login_processing_start_time = time.time()
+    print(f"[LOGIN_API_INFO] Rota /api/login chamada. Firebase inicializado: {firebase_initialized_successfully}")
     try:
         data = request.get_json()
         if not data:
+            print("[LOGIN_API_FAIL] Requisição sem corpo JSON.")
             return jsonify({"sucesso": False, "erro": "Requisição sem corpo JSON."}), 400
+
         username_email_input = data.get('username')
         password = data.get('password')
+
         if not username_email_input or not password:
+            print("[LOGIN_API_FAIL] E-mail ou senha não fornecidos.")
             return jsonify({"sucesso": False, "erro": "E-mail e senha são obrigatórios"}), 400
 
         user = check_user_credentials(username_email_input, password)
 
         if user:
-            print(f"Login bem-sucedido para {username_email_input} em {time.time() - login_start_time:.4f}s")
+            print(f"[LOGIN_API_SUCCESS] Login bem-sucedido para {username_email_input} em {time.time() - login_processing_start_time:.4f}s")
             return jsonify({"sucesso": True, "mensagem": "Login bem-sucedido!", "usuario": user}), 200
         else:
-            # Considerar loggar tentativas de login falhas se necessário
-            print(f"Falha no login para {username_email_input} em {time.time() - login_start_time:.4f}s")
-            return jsonify({"sucesso": False, "erro": "E-mail ou senha inválidos."}), 401
+            print(f"[LOGIN_API_FAIL] Credenciais inválidas para {username_email_input} em {time.time() - login_processing_start_time:.4f}s")
+            return jsonify({"sucesso": False, "erro": "E-mail ou senha inválidos."}), 401 # Unauthorized
     except Exception as e:
-        print(f"ERRO em /api/login: {e}")
+        print(f"[LOGIN_API_ERROR] Exceção na rota /api/login: {e}")
+        import traceback
         traceback.print_exc()
         return jsonify({"sucesso": False, "erro": f"Erro interno no servidor: {str(e)}"}), 500
 
@@ -678,7 +693,7 @@ def delete_livro(livro_id):
         capa_url_antiga = livro_data.get('capa_url')
         if capa_url_antiga and "firebasestorage.googleapis.com" in capa_url_antiga:
             try:
-                blob_name_encoded = capa_url_antiga.split(f"{STORAGE_BUCKET_NAME}/o/")[1].split("?")[0]
+                blob_name_encoded = capa_url_antiga.split(f"{STORAGE_BUCKET_NAME_CONST}/o/")[1].split("?")[0]
                 blob_name = requests.utils.unquote(blob_name_encoded) 
                 
                 blob_to_delete = bucket.blob(blob_name)
@@ -1506,18 +1521,15 @@ def update_status_sugestao_admin(id_sugestao):
         return jsonify({"erro": f"Erro interno ao atualizar status: {str(e)}"}), 500
 
 if __name__ == '__main__':
-    # if db: 
-    #    criar_usuarios_firestore_exemplo() 
-    
-    if not os.path.exists('src'): os.makedirs('src', exist_ok=True)
-    html_files = ['index.html', 'login.html', 'register.html', 
-                  'gerenciar_emprestimos.html', 'gerenciar_usuarios.html', 
-                  'relatorios_admin.html', 'gerenciar_sugestoes.html'] 
-    for html_file in html_files:
-        path = os.path.join(app.static_folder, html_file)
-        if not os.path.exists(path):
-            try:
-                with open(path, 'w', encoding='utf-8') as f: f.write(f"<!DOCTYPE html><html lang=\"pt-BR\"><head><meta charset=\"UTF-8\"><title>Placeholder {html_file}</title></head><body><h1>{html_file}</h1></body></html>")
-                print(f"AVISO: '{path}' não encontrado. Placeholder criado.")
-            except IOError as e: print(f"ERRO ao criar placeholder para '{html_file}': {e}")
-    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 8080)), debug=True)
+    # Para desenvolvimento local, é bom chamar a inicialização aqui
+    # para pegar erros de credenciais mais cedo.
+    # No Cloud Run, o decorador @ensure_firebase_initialized cuidará disso na primeira requisição.
+    if not os.environ.get("GOOGLE_CLOUD_PROJECT"): # Detecta se NÃO está no Cloud Run
+        print("[MAIN_LOCAL] Tentando inicializar Firebase para desenvolvimento local...")
+        initialize_firebase()
+        if not firebase_initialized_successfully:
+            print("[MAIN_LOCAL_WARN] Firebase NÃO inicializado no startup. O app pode não funcionar.")
+
+    port = int(os.environ.get("PORT", 8080))
+    print(f"[STARTUP_LOG] Script principal concluído em {time.time() - initialization_start_time:.4f} segundos. Iniciando servidor Flask na porta {port}...")
+    app.run(host='0.0.0.0', port=port, debug=False) # Use debug=False para Cloud Run
