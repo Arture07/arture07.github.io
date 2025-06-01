@@ -1,5 +1,5 @@
 document.addEventListener('DOMContentLoaded', function() {
-const backendUrl = 'https://arture07-github-io.onrender.com';
+    const backendUrl = 'https://shelfwise-backend-698679522199.southamerica-east1.run.app'; // SUA URL DO CLOUD RUN
     const loginForm = document.getElementById('login-form');
     const messageContainer = document.getElementById('message-container');
 

@@ -40,7 +40,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const confirmResetPasswordButton = document.getElementById('confirmResetPassword');
     const resetPasswordModalOverlay = resetPasswordModal ? resetPasswordModal.querySelector('.modal-overlay-reset') : null;
     
-const backendUrl = 'https://arture07-github-io.onrender.com';
+    const backendUrl = 'https://shelfwise-backend-698679522199.southamerica-east1.run.app'; // SUA URL DO CLOUD RUN
     let currentUser = null;
     let isEditMode = false; 
     let allUsersCache = []; // Cache para todos os usuários carregados
