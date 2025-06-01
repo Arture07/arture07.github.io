@@ -75,7 +75,7 @@ def initialize_firebase():
             if not firebase_admin._apps:
                 firebase_admin.initialize_app(cred, {'storageBucket': 'biblioteca-py-6b33e.appspot.com'}) # SEU BUCKET ID
             db = firestore.client()
-            # bucket = storage.bucket() # Inicialize o bucket apenas se for usado por rotas não-login ou adie
+            bucket = storage.bucket() # Inicialize o bucket apenas se for usado por rotas não-login ou adie
             firebase_initialized_successfully = True
             print(f"[FIREBASE_INIT] Firebase SDK inicializado. 'db' está configurado. Tempo total: {time.time() - firebase_init_start_time:.4f}s.")
         except Exception as e_init_sdk:
@@ -207,9 +207,9 @@ def check_user_credentials(username_email, password):
             return None
 
 # --- Rotas da Aplicação (Servindo arquivos estáticos) ---
-@"""app.route('/')
+@app.route('/')
 def index_page_serve(): 
-    return send_from_directory(app.static_folder, 'index.html')"""
+    return send_from_directory(app.static_folder, 'index.html')
 
 @app.route('/<path:filename>')
 def serve_static(filename='index.html'):
