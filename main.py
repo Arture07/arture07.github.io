@@ -100,6 +100,8 @@ def initialize_firebase_app():
     except Exception as e:
         logging.critical(f"[FIREBASE_INIT_CRITICAL_ERROR] Erro crítico durante a inicialização do Firebase: {e}", exc_info=True)
 
+initialize_firebase_app() # Chamar na inicialização do app
+
 # Decorator para garantir que o Firebase está inicializado
 def ensure_firebase_initialized(f):
     @wraps(f)
