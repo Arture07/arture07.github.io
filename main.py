@@ -1420,3 +1420,4 @@ if __name__ == '__main__':
     print(f"[STARTUP_LOG] Script principal concluído em {time.time() - initialization_start_time:.4f} segundos. Iniciando servidor Flask em host 0.0.0.0 na porta {port}...")
     # Para o Render, debug=False é recomendado. Gunicorn lida com múltiplos workers.
     app.run(host='0.0.0.0', port=port, debug=False)
+    # Este é um comentário de teste para forçar um novo commit
