@@ -26,8 +26,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const cancelFeedbackButton = document.getElementById('cancelSuggestionFeedbackButton');
     // const confirmFeedbackButton = document.getElementById('confirmSuggestionFeedbackButton'); // É o submit do form
 
-    const backendUrl = 'https://shelfwise-backend-698679522199.southamerica-east1.run.app'; // SUA URL DO CLOUD RUN
-
+const backendUrl = 'https://arture07-github-io.onrender.com';
     let currentUser = null;
     let allSuggestionsCache = [];
 

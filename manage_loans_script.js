@@ -65,8 +65,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const cancelExemptFineButton = document.getElementById('cancelExemptFineButton');
     const exemptFineModalOverlay = exemptFineModal ? exemptFineModal.querySelector('.modal-overlay-exempt-fine') : null;
 
-    const backendUrl = 'https://shelfwise-backend-698679522199.southamerica-east1.run.app'; // SUA URL DO CLOUD RUN
-
+const backendUrl = 'https://arture07-github-io.onrender.com';
     let currentUser = null;
     let allLoansCache = []; 
     let selectedLoanForModal = null;
