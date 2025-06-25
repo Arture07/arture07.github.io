@@ -14,8 +14,8 @@ document.addEventListener('DOMContentLoaded', function() {
     // Estado da Paginação de Livros com Cursor
     const limitLivros = 12; 
     let currentPageNumber = 1; 
-    let bookPageCursors = [null]; // Array para guardar o cursor INICIAL de cada página. [0] é null.
-    let hasNextBookPage = false; // Indica se a API retornou que há uma próxima página
+    let bookPageCursors = [null];
+    let hasNextBookPage = false;
 
     // --- Seleção de Elementos da UI ---
     const adminView = document.getElementById('admin-view');
@@ -207,20 +207,14 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     
         try {
-            // As datas da API vêm como string ISO 8601 (UTC).
-            // O construtor Date() do JS as interpreta e converte para o fuso horário local do navegador.
             const dataDevPrev = new Date(dataDevolucaoPrevistaStr);
             
             if (isNaN(dataDevPrev.getTime())) {
-                // console.warn("getLoanStatus: data_devolucao_prevista resultou em Data Inválida após new Date(). Original:", dataDevolucaoPrevistaStr);
                 return { text: 'Data Prev. Inválida', colorClass: 'bg-gray-200 text-gray-800', order: 4 };
             }
     
             const hoje = new Date(); 
             
-            // Normaliza 'hoje' e 'dataDevPrev' para o início do dia para comparação de "dias"
-            // Usamos getFullYear, getMonth, getDate para pegar os componentes da data local do navegador
-            // e da data de devolução (que já foi convertida para o fuso local pelo new Date())
             const hojeNormalizada = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate());
             const dataDevolucaoNormalizada = new Date(dataDevPrev.getFullYear(), dataDevPrev.getMonth(), dataDevPrev.getDate());
     
@@ -532,7 +526,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    function resetPaginationState() { // NOVA FUNÇÃO
+    function resetPaginationState() {
         console.log("DEBUG: resetPaginationState chamada");
         currentPageLivros = 1;
         bookPageCursors = [null]; // O primeiro cursor é sempre null para a primeira página
@@ -608,13 +602,13 @@ document.addEventListener('DOMContentLoaded', function() {
             if (currentUser && currentUser.role === 'cliente' && livro.numero_exemplares_disponiveis > 0) {
                 lendBookSection.classList.remove('hidden');
                 if(lendBookSectionTitle) lendBookSectionTitle.textContent = "Confirmar Empréstimo";
-                leitorNomeInput.value = currentUser.nome || currentUser.username; // Usa nome aqui
+                leitorNomeInput.value = currentUser.nome || currentUser.username;
                 leitorNomeInput.readOnly = true; 
                 leitorNomeInput.classList.add('bg-gray-100'); 
             } else if (currentUser && (currentUser.role === 'admin' || currentUser.role === 'atendente') && livro.numero_exemplares_disponiveis > 0) {
                 lendBookSection.classList.remove('hidden');
                 if(lendBookSectionTitle) lendBookSectionTitle.textContent = "Emprestar Livro";
-                leitorNomeInput.value = ''; // Admin/Atendente digita o nome do leitor
+                leitorNomeInput.value = '';
                 leitorNomeInput.readOnly = false; 
                 leitorNomeInput.classList.remove('bg-gray-100'); 
             } else {
@@ -714,7 +708,6 @@ document.addEventListener('DOMContentLoaded', function() {
             const cardContent = document.createElement('div'); 
             cardContent.className = 'flex-grow flex flex-col book-card-clickable'; 
             cardContent.addEventListener('click', (e) => {
-                // Impede que o clique no card acione se o clique foi num botão de admin dentro do card
                 if (e.target.closest('.edit-book-btn') || e.target.closest('.delete-book-btn')) {
                     return;
                 }
@@ -856,11 +849,9 @@ document.addEventListener('DOMContentLoaded', function() {
             if (data.pagination && bookPaginationControls && pageInfoSpan && prevPageButton && nextPageButton) {
                 hasNextBookPage = data.pagination.has_next_page;
                 if (hasNextBookPage && data.pagination.next_page_cursor) {
-                    // Armazena o cursor para a PRÓXIMA página, se ela existir e não tivermos já esse cursor.
                     if (bookPageCursors.length === currentPageNumber) {
                         bookPageCursors.push(data.pagination.next_page_cursor);
                     } else {
-                        // Se estamos navegando para trás e para frente, o cursor da próxima página pode já existir ou precisar ser atualizado
                         bookPageCursors[currentPageNumber] = data.pagination.next_page_cursor;
                     }
                 }
@@ -884,7 +875,7 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
 
-        if (currentPageNumber === 1 && !hasNext) { // Se for a única página
+        if (currentPageNumber === 1 && !hasNext) { 
             bookPaginationControls.classList.add('hidden');
             return;
         }
@@ -903,8 +894,6 @@ document.addEventListener('DOMContentLoaded', function() {
         } else if (direcao === 'prev' && prevPageButton && !prevPageButton.disabled) {
             if (currentPageLivros > 1) {
                 currentPageNumber--;
-                // Ao voltar, o cursor para a próxima página (que agora é a atual) já deve estar em bookPageCursors
-                // A carregarEListarLivros usará bookPageCursors[currentPageNumber - 1]
                 carregarEListarLivros();
             }
         }
