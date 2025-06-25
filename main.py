@@ -9,17 +9,15 @@ from datetime import datetime, timezone, timedelta
 import requests
 import re
 from collections import Counter, defaultdict
-import traceback # Para logging de exceções
+import traceback
 from flask_cors import CORS
 from google.cloud import secretmanager
-import logging # Usar o logging padrão do Python
+import logging
 from functools import wraps
 import time
 
 # --- 0) Configurações iniciais, Logging e instanciação do Flask ---
 
-# Configurar logging básico
-# No Cloud Run, os prints e logs do logging são capturados automaticamente.
 logging.basicConfig(level=logging.INFO, format='[%(asctime)s] [%(levelname)s] %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
 
 initialization_start_time = time.time()
@@ -32,7 +30,6 @@ CORS(app,
          "https://arture07.github.io",
          "http://localhost:8080",
          "http://127.0.0.1:8080",
-         # Adicione a URL do seu serviço Cloud Run aqui se o frontend for servido separadamente
      ],
      methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
      allow_headers=["Content-Type", "Authorization"],
@@ -102,7 +99,7 @@ def initialize_firebase_app():
 
 initialize_firebase_app() # Chamar na inicialização do app
 
-# Decorator para garantir que o Firebase está inicializado
+# Garantir que o Firebase está inicializado
 def ensure_firebase_initialized(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
@@ -293,7 +290,7 @@ def register_client_user():
         return jsonify({"erro": "Erro interno ao criar conta."}), 500
 
 @app.route('/api/isbn_lookup', methods=['GET'])
-@ensure_firebase_initialized # Embora não use db diretamente, é uma boa prática para consistência
+@ensure_firebase_initialized
 def isbn_lookup():
     isbn = request.args.get('isbn')
     if not isbn:
@@ -399,7 +396,7 @@ def adicionar_livro():
         else:
             numero_exemplares_disponiveis = numero_exemplares_total
         livro_para_salvar = {'titulo': titulo, 'autor': autor, 'isbn': isbn, 'ano_publicacao': ano_publicacao_int, 'genero': request.form.get('genero', '').strip(), 'editora': request.form.get('editora', '').strip(), 'numero_exemplares_total': numero_exemplares_total, 'numero_exemplares_disponiveis': numero_exemplares_disponiveis, 'capa_url': capa_url_final, 'data_cadastro': datetime.now(timezone.utc)}
-        _, doc_ref = db.collection('livros').add(livro_para_salvar) # Use _ para o primeiro elemento da tupla
+        _, doc_ref = db.collection('livros').add(livro_para_salvar)
         id_novo_livro = doc_ref.id
         logging.info(f"Livro adicionado com ID: {id_novo_livro}, Título: {titulo}")
         return jsonify({"mensagem": "Livro adicionado com sucesso!", "id_livro": id_novo_livro, "capa_url": capa_url_final}), 201
@@ -563,7 +560,7 @@ def get_generos():
             livro_data = doc.to_dict(); genero_str = livro_data.get('genero')
             if genero_str and isinstance(genero_str, str):
                 generos_individuais = [g.strip() for g in genero_str.split(',') if g.strip()]
-                for g_ind in generos_individuais: generos_set.add(g_ind) # Renomeado para evitar conflito
+                for g_ind in generos_individuais: generos_set.add(g_ind)
         return jsonify(sorted(list(generos_set), key=lambda s: s.lower())), 200
     except Exception as e:
         logging.error(f"ERRO AO BUSCAR GÊNEROS: {e}", exc_info=True)
@@ -614,7 +611,7 @@ def renovar_emprestimo(id_emprestimo):
         if not data_devolucao_atual_obj: return jsonify({"erro": "Data de devolução atual não encontrada para este empréstimo."}), 500
         if isinstance(data_devolucao_atual_obj, str): data_devolucao_atual = datetime.fromisoformat(data_devolucao_atual_obj.replace('Z', '+00:00'))
         elif isinstance(data_devolucao_atual_obj, datetime): data_devolucao_atual = data_devolucao_atual_obj
-        else: data_devolucao_atual = data_devolucao_atual_obj.to_datetime().replace(tzinfo=timezone.utc) # Para Timestamps do Firestore mais antigos
+        else: data_devolucao_atual = data_devolucao_atual_obj.to_datetime().replace(tzinfo=timezone.utc)
         nova_data_devolucao = data_devolucao_atual + timedelta(days=7); vezes_renovado_novo = vezes_renovado_atual + 1
         emprestimo_ref.update({'data_devolucao_prevista': nova_data_devolucao, 'vezes_renovado': vezes_renovado_novo, 'data_ultima_renovacao': datetime.now(timezone.utc)})
         logging.info(f"Empréstimo renovado: {id_emprestimo}")
@@ -746,7 +743,7 @@ def registrar_devolucao_api():
             return jsonify({"erro": str(e)}), 400
         return jsonify({"erro": f"Erro interno ao registrar devolução: {str(e)}"}), 500
 
-def serialize_emprestimo_datas(emprestimo_data): # Duplicado, remover uma instância
+def serialize_emprestimo_datas(emprestimo_data):
     if not isinstance(emprestimo_data, dict): return emprestimo_data
     date_keys = ['data_emprestimo', 'data_devolucao_prevista', 'data_devolucao_real', 'multa_data_pagamento', 'multa_data_isencao', 'data_ultima_renovacao']
     for key in date_keys:
@@ -910,7 +907,7 @@ def delete_user(user_id):
     try:
         user_ref = db.collection('usuarios').document(user_id)
         if not user_ref.get().exists: return jsonify({"erro": "Usuário não encontrado."}), 404
-        user_ref.update({'status': 'INATIVO'}) # Desativa em vez de deletar
+        user_ref.update({'status': 'INATIVO'})
         logging.info(f"Usuário {user_id} desativado.")
         return jsonify({"mensagem": f"Usuário {user_id} desativado."}), 200
     except Exception as e:
@@ -964,7 +961,7 @@ def get_generos_mais_populares_api():
                     livros_cache[livro_id] = livro_d.to_dict().get('genero', '') if livro_d.exists else ''
                 generos_str = livros_cache[livro_id]
                 if generos_str:
-                    for g_item in [gen.strip().capitalize() for gen in generos_str.split(',') if gen.strip()]: contagem_g[g_item] += 1 # Renomeado para evitar conflito
+                    for g_item in [gen.strip().capitalize() for gen in generos_str.split(',') if gen.strip()]: contagem_g[g_item] += 1
         populares = [{"genero": g_item, "emprestimos": c} for g_item, c in contagem_g.most_common(10)]
         return jsonify(populares), 200
     except Exception as e:
@@ -1122,10 +1119,8 @@ def update_status_sugestao_admin(id_sugestao):
 if __name__ == '__main__':
     if not os.environ.get("GOOGLE_CLOUD_PROJECT"):
         logging.info("[MAIN_LOCAL] Tentando inicializar Firebase para desenvolvimento local...")
-        # A inicialização já foi chamada globalmente, mas podemos verificar o status
         if not firebase_initialized_successfully:
             logging.warning("[MAIN_LOCAL_WARN] Firebase NÃO inicializado no startup. O app pode não funcionar.")
-        # criar_usuarios_firestore_exemplo() # Descomente para popular em dev local
     port = int(os.environ.get("PORT", 8080))
     logging.info(f"[STARTUP_LOG] Script principal concluído em {time.time() - initialization_start_time:.4f} segundos. Iniciando servidor Flask na porta {port}...")
-    app.run(host='0.0.0.0', port=port, debug=False) # debug=False para produção no Cloud Run
+    app.run(host='0.0.0.0', port=port, debug=False)
