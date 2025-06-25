@@ -19,7 +19,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const emprestimosAtrasadosTableBody = document.getElementById('emprestimosAtrasadosTableBody');
     const noEmprestimosAtrasadosMessage = document.getElementById('noEmprestimosAtrasadosMessage');
 
-    const backendUrl = 'https://shelfwise-backend-698679522199.southamerica-east1.run.app'; // SUA URL DO CLOUD RUN
+    const backendUrl = 'https://shelfwise-backend-698679522199.southamerica-east1.run.app';
 
     let currentUser = null;
     let livrosChart = null;
@@ -103,7 +103,7 @@ document.addEventListener('DOMContentLoaded', function() {
             return null;
         }
         if (chartInstance) {
-            chartInstance.destroy(); // Destrói instância anterior para evitar sobreposição
+            chartInstance.destroy(); 
         }
         return new Chart(ctx, {
             type: 'bar',
@@ -112,7 +112,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 datasets: [{
                     label: tituloLabel,
                     data: data,
-                    backgroundColor: 'rgba(54, 162, 235, 0.6)', // Azul
+                    backgroundColor: 'rgba(54, 162, 235, 0.6)', 
                     borderColor: 'rgba(54, 162, 235, 1)',
                     borderWidth: 1
                 }]
@@ -120,7 +120,7 @@ document.addEventListener('DOMContentLoaded', function() {
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
-                scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } } // Garante que o eixo Y comece em 0 e tenha passos inteiros
+                scales: { y: { beginAtZero: true, ticks: { stepSize: 1 }}} 
             }
         });
     }
@@ -141,7 +141,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 datasets: [{
                     label: tituloLabel,
                     data: data,
-                    backgroundColor: [ // Cores variadas para pizza
+                    backgroundColor: [
                         'rgba(255, 99, 132, 0.7)', 'rgba(54, 162, 235, 0.7)',
                         'rgba(255, 206, 86, 0.7)', 'rgba(75, 192, 192, 0.7)',
                         'rgba(153, 102, 255, 0.7)', 'rgba(255, 159, 64, 0.7)',
@@ -223,11 +223,11 @@ document.addEventListener('DOMContentLoaded', function() {
     async function fetchEmprestimosPorPeriodo() {
         if(emprestimosPorPeriodoLoading) emprestimosPorPeriodoLoading.classList.remove('hidden');
         try {
-            const response = await fetch(`${backendUrl}/api/admin/relatorios/emprestimos-por-periodo?dias=30`); // Padrão 30 dias
+            const response = await fetch(`${backendUrl}/api/admin/relatorios/emprestimos-por-periodo?dias=30`);
             if (!response.ok) throw new Error('Falha ao buscar dados de empréstimos por período.');
             const dados = await response.json();
 
-            const dias = dados.map(d => new Date(d.dia + 'T00:00:00Z').toLocaleDateString('pt-BR', {day: '2-digit', month: '2-digit'})); // Formata dia
+            const dias = dados.map(d => new Date(d.dia + 'T00:00:00Z').toLocaleDateString('pt-BR', {day: '2-digit', month: '2-digit'})); 
             const contagens = dados.map(d => d.emprestimos);
 
             periodoChart = criarGraficoLinha('emprestimosPorPeriodoChart', dias, contagens, 'Nº de Empréstimos', periodoChart);
@@ -264,7 +264,7 @@ document.addEventListener('DOMContentLoaded', function() {
     function renderTabelaAtrasados(emprestimos) {
         if (!emprestimosAtrasadosTableBody || !tabelaAtrasadosContainer || !noEmprestimosAtrasadosMessage) return;
         
-        emprestimosAtrasadosTableBody.innerHTML = ''; // Limpa tabela
+        emprestimosAtrasadosTableBody.innerHTML = '';
         if (emprestimos.length === 0) {
             tabelaAtrasadosContainer.classList.add('hidden');
             noEmprestimosAtrasadosMessage.classList.remove('hidden');
