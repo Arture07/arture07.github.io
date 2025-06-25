@@ -40,10 +40,10 @@ document.addEventListener('DOMContentLoaded', function() {
     const confirmResetPasswordButton = document.getElementById('confirmResetPassword');
     const resetPasswordModalOverlay = resetPasswordModal ? resetPasswordModal.querySelector('.modal-overlay-reset') : null;
     
-    const backendUrl = 'https://shelfwise-backend-698679522199.southamerica-east1.run.app'; // SUA URL DO CLOUD RUN
+    const backendUrl = 'https://shelfwise-backend-698679522199.southamerica-east1.run.app'; 
     let currentUser = null;
     let isEditMode = false; 
-    let allUsersCache = []; // Cache para todos os usuários carregados
+    let allUsersCache = [];
 
     // --- Funções Auxiliares ---
     function showMessage(message, type = 'info') {
@@ -72,7 +72,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if(loginPromptView) loginPromptView.classList.add('hidden');
         if(accessDeniedView) accessDeniedView.classList.add('hidden');
         if(adminView) adminView.classList.remove('hidden');
-        fetchAndFilterUsers(); // Carrega e aplica filtros iniciais
+        fetchAndFilterUsers();
     }
 
     function showAccessDenied() {
@@ -120,8 +120,8 @@ document.addEventListener('DOMContentLoaded', function() {
                  const errorData = await response.json().catch(()=> ({erro: `Erro HTTP ${response.status}`}));
                  throw new Error(errorData.erro || 'Falha ao buscar usuários.');
             }
-            allUsersCache = await response.json(); // Armazena no cache
-            applyUserFiltersAndRender(); // Aplica filtros e renderiza
+            allUsersCache = await response.json();
+            applyUserFiltersAndRender(); 
         } catch (error) {
             showMessage(error.message, 'error');
             if(usersTableBody) usersTableBody.innerHTML = '<tr><td colspan="5" class="text-center py-10 text-red-500">Erro ao carregar usuários.</td></tr>';
@@ -192,10 +192,9 @@ document.addEventListener('DOMContentLoaded', function() {
         isEditMode = !!user;
         if(userForm) userForm.reset();
         
-        // Popula o select de papéis - AGORA INCLUI CLIENTE
         if(userRoleSelect) {
             userRoleSelect.innerHTML = ''; 
-            const allRolesForSelect = ['cliente', 'admin', 'catalogador', 'atendente', 'analista']; // Inclui cliente
+            const allRolesForSelect = ['cliente', 'admin', 'catalogador', 'atendente', 'analista']; 
             allRolesForSelect.forEach(role => {
                 const option = document.createElement('option');
                 option.value = role;
@@ -223,22 +222,18 @@ document.addEventListener('DOMContentLoaded', function() {
             if(userPasswordInput) userPasswordInput.placeholder = "Deixe em branco para não alterar";
             if(statusFieldContainer) statusFieldContainer.classList.remove('hidden'); 
         } else {
-            if(userModalTitle) userModalTitle.textContent = 'Adicionar Novo Usuário'; // Alterado para ser mais genérico
+            if(userModalTitle) userModalTitle.textContent = 'Adicionar Novo Usuário'; 
             if(userIdInput) userIdInput.value = '';
             if(userUsernameInput) userUsernameInput.disabled = false;
             if(passwordFieldContainer) passwordFieldContainer.classList.remove('hidden');
             if(userPasswordInput) userPasswordInput.required = true;
             if(userPasswordInput) userPasswordInput.placeholder = "Mínimo 6 caracteres";
             if(statusFieldContainer) statusFieldContainer.classList.add('hidden'); 
-            if(userRoleSelect) userRoleSelect.value = 'cliente'; // Padrão para novo usuário é cliente
+            if(userRoleSelect) userRoleSelect.value = 'cliente';
         }
         if(userModal) userModal.classList.remove('hidden');
         document.body.classList.add('overflow-hidden');
     }
-
-    // ... (Restante das funções: closeUserModal, openResetPasswordModal, closeResetPasswordModal, handleUserFormSubmit, handleDeleteOrActivateUser, handleResetPasswordSubmit)
-    // Essas funções permanecem como na versão `manage_users_script_granular_roles` do Canvas.
-    // Vou incluí-las abaixo para completude.
 
     function closeUserModal() {
         if(userModal) userModal.classList.add('hidden');
@@ -301,7 +296,7 @@ document.addEventListener('DOMContentLoaded', function() {
             
             showMessage(result.mensagem || "Usuário salvo com sucesso!", 'success');
             closeUserModal();
-            fetchAndFilterUsers(); // Atualiza a tabela
+            fetchAndFilterUsers();
         } catch (error) {
             showMessage(error.message, 'error');
         }
