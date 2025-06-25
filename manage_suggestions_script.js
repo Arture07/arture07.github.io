@@ -24,9 +24,8 @@ document.addEventListener('DOMContentLoaded', function() {
     const feedbackNewStatusInput = document.getElementById('feedbackNewStatus');
     const adminFeedbackTextInput = document.getElementById('adminFeedbackText');
     const cancelFeedbackButton = document.getElementById('cancelSuggestionFeedbackButton');
-    // const confirmFeedbackButton = document.getElementById('confirmSuggestionFeedbackButton'); // É o submit do form
 
-    const backendUrl = 'https://shelfwise-backend-698679522199.southamerica-east1.run.app'; // SUA URL DO CLOUD RUN
+    const backendUrl = 'https://shelfwise-backend-698679522199.southamerica-east1.run.app';
     let currentUser = null;
     let allSuggestionsCache = [];
 
@@ -75,7 +74,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (loggedInUser) {
             try {
                 const user = JSON.parse(loggedInUser);
-                if (user && user.role === 'admin') { // Somente admin pode gerenciar sugestões
+                if (user && user.role === 'admin') {
                     setupAdminUI(user);
                 } else {
                     showAccessDenied();
@@ -101,8 +100,8 @@ document.addEventListener('DOMContentLoaded', function() {
         try {
             const headers = {};
             if (currentUser && currentUser.username) {
-                headers['X-User-Username'] = currentUser.username; // Simulação para backend
-                headers['X-User-Role'] = currentUser.role;       // Simulação para backend
+                headers['X-User-Username'] = currentUser.username;
+                headers['X-User-Role'] = currentUser.role;       
             }
             const response = await fetch(`${backendUrl}/api/admin/sugestoes`, { headers });
             if (!response.ok) {
@@ -175,7 +174,6 @@ document.addEventListener('DOMContentLoaded', function() {
                      ${sug.admin_feedback ? `<button class="view-admin-feedback-btn text-purple-500 hover:text-purple-700 p-1 rounded hover:bg-purple-100 ml-2" title="Ver Feedback Admin: ${sug.admin_feedback}"><svg class="w-5 h-5 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"></path></svg></button>` : ''}
                 </td>
             `;
-            // Adicionar listeners para os botões de ação
             const approveBtn = row.querySelector('.approve-suggestion-btn');
             if(approveBtn) approveBtn.addEventListener('click', () => openFeedbackModal(sug.id_sugestao, 'aprovada', sug.titulo_sugerido));
             
