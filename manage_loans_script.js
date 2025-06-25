@@ -13,7 +13,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const messageContainer = document.getElementById('message-container');
 
     // Filtros Avançados
-    const loanSearchInput = document.getElementById('loan-search-input-adv'); // ID do HTML de filtros avançados
+    const loanSearchInput = document.getElementById('loan-search-input-adv');
     const loanStatusFilter = document.getElementById('loan-status-filter');
     const loanDateFromInput = document.getElementById('loan-date-from');
     const loanDateToInput = document.getElementById('loan-date-to');
@@ -235,13 +235,9 @@ document.addEventListener('DOMContentLoaded', function() {
         if (confirmModalConfirmButton.parentNode) {
             confirmModalConfirmButton.parentNode.replaceChild(newBtn, confirmModalConfirmButton);
         }
-        // É crucial reatribuir a referência ao botão clonado se você pretende adicionar listeners a ele DEPOIS desta função.
-        // No entanto, a prática mais segura é adicionar o listener aqui mesmo ou garantir que o ID seja único se clonar.
-        // Para este caso, o listener é adicionado uma vez no final do script.
+        
         const newConfirmBtnRef = document.getElementById('confirmModalConfirmButton'); 
         if(newConfirmBtnRef) {
-            // Este listener é adicionado uma vez no final do script, não precisa ser readicionado aqui
-            // a menos que a lógica de currentActionToConfirm precise de um listener específico por chamada.
         }
         
         confirmationModal.classList.remove('hidden'); document.body.classList.add('overflow-hidden');
@@ -277,25 +273,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         loansTableBody.innerHTML = '<tr><td colspan="10" class="text-center py-10 text-gray-500">Carregando empréstimos...</td></tr>';
         noLoansMessage.classList.add('hidden');
-        
-        // PREPARAÇÃO DOS PARÂMETROS DE FILTRO PARA A API (se o backend for modificado para usá-los)
-        // const params = new URLSearchParams();
-        // if (loanSearchInput && loanSearchInput.value.trim()) {
-        //     params.append('search', loanSearchInput.value.trim());
-        // }
-        // if (loanStatusFilter && loanStatusFilter.value) {
-        //     params.append('status_emprestimo', loanStatusFilter.value); // Nome do parâmetro consistente com backend
-        // }
-        // if (loanDateFromInput && loanDateFromInput.value) {
-        //     params.append('data_emprestimo_inicio', loanDateFromInput.value);
-        // }
-        // if (loanDateToInput && loanDateToInput.value) {
-        //     params.append('data_emprestimo_fim', loanDateToInput.value);
-        // }
-        // const queryString = params.toString();
-        // const apiUrl = `/api/admin/emprestimos${queryString ? '?' + queryString : ''}`;
-        
-        // Por enquanto, busca todos e filtra no frontend
         const apiUrl = '/api/admin/emprestimos'; 
 
         try {
@@ -337,16 +314,16 @@ document.addEventListener('DOMContentLoaded', function() {
         if (statusValue) {
             if (statusValue === 'atrasado') {
                 loansToRender = loansToRender.filter(emp => getLoanStatus(emp).text === 'Atrasado');
-            } else { // 'emprestado' ou 'devolvido'
+            } else {
                  loansToRender = loansToRender.filter(emp => emp.status === statusValue);
             }
         }
         if (dateFromStr) {
-            const fromDate = new Date(dateFromStr + "T00:00:00Z"); // Considera o início do dia em UTC
+            const fromDate = new Date(dateFromStr + "T00:00:00Z");
             loansToRender = loansToRender.filter(emp => emp.data_emprestimo && new Date(emp.data_emprestimo) >= fromDate);
         }
         if (dateToStr) {
-            const toDate = new Date(dateToStr + "T23:59:59Z"); // Considera o fim do dia em UTC
+            const toDate = new Date(dateToStr + "T23:59:59Z"); 
             loansToRender = loansToRender.filter(emp => emp.data_emprestimo && new Date(emp.data_emprestimo) <= toDate);
         }
         renderizarTabelaEmprestimos(loansToRender);
@@ -357,21 +334,19 @@ document.addEventListener('DOMContentLoaded', function() {
         if (emprestimo.status === 'devolvido') {
             return { text: 'Devolvido', colorClass: 'bg-blue-100 text-blue-800', order: 3 };
         }
-        const hoje = new Date(); // Data local do navegador
+        const hoje = new Date();
         const dataDevolucaoPrevistaStr = emprestimo.data_devolucao_prevista;
 
         if (!dataDevolucaoPrevistaStr) {
             return { text: 'Data Prev. Inválida', colorClass: 'bg-gray-100 text-gray-700', order: 4 };
         }
         
-        // As datas do Firestore vêm como strings ISO 8601 (UTC)
         const dataDev = new Date(dataDevolucaoPrevistaStr); 
 
         if (isNaN(dataDev.getTime())) { 
              return { text: 'Data Prev. Inválida', colorClass: 'bg-gray-100 text-gray-700', order: 4 };
         }
         
-        // Normaliza 'hoje' para o início do dia para comparação justa de datas
         const hojeNormalizada = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate());
         const dataDevolucaoNormalizada = new Date(dataDev.getFullYear(), dataDev.getMonth(), dataDev.getDate());
 
@@ -450,7 +425,7 @@ document.addEventListener('DOMContentLoaded', function() {
             if(returnButtonTable) returnButtonTable.addEventListener('click', (e) => {
                 e.stopPropagation(); 
                 const loanId = e.currentTarget.dataset.loanId;
-                promptForDevolucao(loanId, 'table'); // Passa 'table' como contexto
+                promptForDevolucao(loanId, 'table');
             });
         });
     }
@@ -466,11 +441,8 @@ document.addEventListener('DOMContentLoaded', function() {
         let originalButtonHTML = '';
 
         if (sourceButtonContext === 'modal' && selectedLoanForModal && selectedLoanForModal.id_emprestimo === idEmprestimo) {
-            btnDevolver = registrarDevolucaoButtonFromModal; // Botão do modal
+            btnDevolver = registrarDevolucaoButtonFromModal;
         } else if (sourceButtonContext === 'table') {
-            // Tenta encontrar o botão na linha da tabela (pode ser mais complexo se não houver ID direto no botão)
-            // Por simplicidade, não vamos mostrar o loading no botão da tabela aqui, apenas no modal.
-            // A tabela será recarregada de qualquer forma.
         }
         
         if (btnDevolver) { 
@@ -489,7 +461,7 @@ document.addEventListener('DOMContentLoaded', function() {
             if (!response.ok) throw new Error(result.erro || `Erro ${response.status}`);
             showMessage(result.mensagem || "Devolução registrada!", "success");
             closeLoanDetailModal(); 
-            fetchAllLoansWithFilters(); // Recarrega a lista com filtros aplicados
+            fetchAllLoansWithFilters();
         } catch (error) {
             showMessage(`Erro: ${error.message}`, "error");
         } finally {
@@ -499,7 +471,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     async function handlePagarMulta(idEmprestimo) {
         openConfirmationModal("Confirmar Pagamento", "Registrar o pagamento total desta multa?", async () => {
-            const btn = pagarMultaButton; // Botão no modal de detalhes
+            const btn = pagarMultaButton;
             let originalBtnHTML = '';
             if(btn) { originalBtnHTML = btn.innerHTML; btn.innerHTML = `Processando...`; btn.disabled = true; }
             try {
@@ -586,7 +558,7 @@ document.addEventListener('DOMContentLoaded', function() {
     if(cancelExemptFineButton) cancelExemptFineButton.addEventListener('click', closeExemptFineModal);
     if(exemptFineModalOverlay) exemptFineModalOverlay.addEventListener('click', closeExemptFineModal);
 
-    if(confirmModalConfirmButton) { // Adicionado listener ao botão de confirmação principal
+    if(confirmModalConfirmButton) {
          confirmModalConfirmButton.addEventListener('click', () => {
             if (typeof currentActionToConfirm === 'function') {
                 currentActionToConfirm(); 
